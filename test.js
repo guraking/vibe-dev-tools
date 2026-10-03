@@ -97,3 +97,82 @@ test('buildRequest: 파일 내용이 비었거나 base64 가 아니면 파일명
   await assert.rejects(bad(''), { code: 'INVALID_FILE', message: /a\.txt/ });
   await assert.rejects(bad('@@@'), { code: 'INVALID_FILE' });
 });
+
+// 받은 요청을 JSON 으로 그대로 돌려주는 서버. /slow 는 응답하지 않고, /big 은 11MB 를 보낸다.
+async function startEcho() {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/slow') return;
+    if (req.url === '/big') return res.end(Buffer.alloc(11 * 1024 * 1024, 97));
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ method: req.method, url: req.url, headers: req.headers, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+  });
+  const base = await listen(server);
+  return { base, close() { server.closeAllConnections(); server.close(); } };
+}
+
+let echo;
+before(async () => { echo = await startEcho(); });
+after(() => echo.close());
+
+test('sendRequest: 요청을 보내고 상태·헤더·본문·시간을 돌려준다', async () => {
+  const r = await sendRequest({
+    method: 'POST',
+    url: `${echo.base}/x`,
+    params: [{ key: 'q', value: '1', enabled: true }],
+    headers: [{ key: 'X-A', value: '{{v}}', enabled: true }],
+    body: { type: 'json', raw: '{"a":1}' },
+    variables: { v: 'b' },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, 200);
+  assert.equal(typeof r.timeMs, 'number');
+  assert.equal(r.truncated, false);
+  assert.ok(r.headers.some(([k]) => k.toLowerCase() === 'content-type'));
+  const echoed = JSON.parse(r.body);
+  assert.equal(echoed.method, 'POST');
+  assert.equal(echoed.url, '/x?q=1');
+  assert.equal(echoed.headers['x-a'], 'b');
+  assert.equal(echoed.headers['content-length'], '7');
+  assert.equal(echoed.body, '{"a":1}');
+});
+
+test('sendRequest: form-data 로 텍스트와 파일을 보낸다', async () => {
+  const r = await sendRequest({
+    method: 'POST',
+    url: `${echo.base}/upload`,
+    body: { type: 'form', fields: [
+      { key: 't', type: 'text', value: 'v', enabled: true },
+      { key: 'f', type: 'file', fileName: 'a.txt', fileBase64: 'aGVsbG8=', enabled: true },
+    ] },
+  });
+  const echoed = JSON.parse(r.body);
+  assert.match(echoed.headers['content-type'], /^multipart\/form-data; boundary=/);
+  assert.match(echoed.body, /filename="a.txt"/);
+  assert.match(echoed.body, /hello/);
+});
+
+test('sendRequest: 타임아웃이 지나면 TIMEOUT 으로 실패한다', async () => {
+  await assert.rejects(sendRequest({ url: `${echo.base}/slow`, settings: { timeoutMs: 200 } }), { code: 'TIMEOUT' });
+});
+
+test('sendRequest: 10MB 넘는 응답은 앞 10MB 만 돌려준다', async () => {
+  const r = await sendRequest({ url: `${echo.base}/big` });
+  assert.equal(r.truncated, true);
+  assert.equal(r.size, 11 * 1024 * 1024);
+  assert.equal(r.body.length, 10 * 1024 * 1024);
+});
+
+test('toError: 연결 거부·SSL 오류·RequestError 를 화면용 메시지로 바꾼다', async () => {
+  const closed = http.createServer();
+  const base = await listen(closed);
+  await new Promise((resolve) => closed.close(resolve));
+  const err = await sendRequest({ url: base }).catch((e) => e);
+  assert.deepEqual(toError(err), { code: 'ECONNREFUSED', message: '연결이 거부되었습니다', hint: '서버 주소와 포트를 확인하세요' });
+  const ssl = Object.assign(new Error('self signed certificate'), { code: 'DEPTH_ZERO_SELF_SIGNED_CERT' });
+  assert.equal(toError(ssl).hint, 'SSL 검증 무시를 켜보세요');
+  assert.deepEqual(toError(new RequestError('UNDEFINED_VARIABLE', 'x', 'y')), { code: 'UNDEFINED_VARIABLE', message: 'x', hint: 'y' });
+});

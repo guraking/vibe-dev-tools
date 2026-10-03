@@ -103,4 +103,78 @@ async function buildRequest(spec) {
   return { method: String(spec.method || 'GET').toUpperCase(), url, headers, body };
 }
 
-module.exports = { RequestError, substitute, buildRequest };
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 화면이 멈추지 않도록 응답 본문은 10MB 까지만 돌려준다
+const DEFAULT_TIMEOUT_MS = 30000;
+
+// 요청을 보내고 응답 전체를 모은다. 연결 실패·타임아웃은 reject 하고, HTTP 오류 상태(4xx/5xx)는 정상 응답으로 돌려준다.
+// 리다이렉트는 따라가지 않고 3xx 응답을 그대로 보여준다.
+async function sendRequest(spec) {
+  const settings = spec.settings || {};
+  const timeoutMs = Number.isFinite(settings.timeoutMs) && settings.timeoutMs > 0 ? settings.timeoutMs : DEFAULT_TIMEOUT_MS;
+  const { method, url, headers, body } = await buildRequest(spec);
+  if (body) headers['Content-Length'] = body.length;
+  const lib = url.protocol === 'https:' ? https : http;
+  const started = performance.now();
+
+  return new Promise((resolve, reject) => {
+    let response = null;
+    const req = lib.request(url, { method, headers, rejectUnauthorized: !settings.insecure }, (res) => {
+      response = res;
+      const chunks = [];
+      let size = 0;
+      let kept = 0;
+      res.on('data', (chunk) => {
+        size += chunk.length;
+        if (kept < MAX_RESPONSE_BYTES) {
+          const part = chunk.subarray(0, MAX_RESPONSE_BYTES - kept);
+          chunks.push(part);
+          kept += part.length;
+        }
+      });
+      res.on('error', fail);
+      res.on('end', () => {
+        clearTimeout(timer);
+        const pairs = [];
+        for (let i = 0; i < res.rawHeaders.length; i += 2) pairs.push([res.rawHeaders[i], res.rawHeaders[i + 1]]);
+        resolve({
+          ok: true,
+          status: res.statusCode,
+          statusText: res.statusMessage,
+          timeMs: Math.round(performance.now() - started),
+          size,
+          headers: pairs,
+          body: Buffer.concat(chunks).toString('utf8'),
+          truncated: size > MAX_RESPONSE_BYTES,
+        });
+      });
+    });
+    // 타이머는 연결부터 응답 본문 끝까지 전체 시간을 잰다.
+    const timer = setTimeout(() => {
+      const err = new RequestError('TIMEOUT', `${timeoutMs}ms 안에 응답이 끝나지 않았습니다`, '설정에서 타임아웃을 늘려보세요');
+      req.destroy(err);
+      response?.destroy(err);
+    }, timeoutMs);
+    function fail(err) {
+      clearTimeout(timer);
+      reject(err);
+    }
+    req.on('error', fail);
+    req.end(body ?? undefined);
+  });
+}
+
+const SSL_ERROR_CODES = new Set([
+  'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_HAS_EXPIRED', 'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
+
+// 화면에 보여줄 { code, message, hint } 로 바꾼다.
+function toError(err) {
+  if (err instanceof RequestError) return { code: err.code, message: err.message, hint: err.hint };
+  if (err.code === 'ECONNREFUSED') return { code: err.code, message: '연결이 거부되었습니다', hint: '서버 주소와 포트를 확인하세요' };
+  if (err.code === 'ENOTFOUND') return { code: err.code, message: '호스트를 찾을 수 없습니다', hint: '주소 철자와 사내망 연결을 확인하세요' };
+  if (SSL_ERROR_CODES.has(err.code)) return { code: err.code, message: `SSL 인증서 오류: ${err.message}`, hint: 'SSL 검증 무시를 켜보세요' };
+  return { code: err.code || 'ERROR', message: err.message, hint: '' };
+}
+
+module.exports = { RequestError, substitute, buildRequest, sendRequest, toError };
