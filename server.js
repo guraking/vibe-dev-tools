@@ -320,4 +320,103 @@ function convertPostmanRequest(source, state) {
   return request;
 }
 
-module.exports = { RequestError, substitute, buildRequest, sendRequest, toError, loadData, saveData, convertPostman };
+const MAX_REQUEST_BYTES = 50 * 1024 * 1024; // 첨부 파일이 base64 로 실려 오므로 넉넉히 잡는다
+
+// 본문을 끝까지 읽은 뒤 판정한다. 중간에 끊으면 브라우저가 413 대신 연결 오류를 받는다.
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size <= MAX_REQUEST_BYTES) chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (size > MAX_REQUEST_BYTES) return reject(new RequestError('TOO_LARGE', `요청 본문이 ${MAX_REQUEST_BYTES / 1024 / 1024}MB 를 넘습니다`, '첨부 파일 크기를 줄이세요'));
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        reject(new RequestError('INVALID_JSON', '요청 본문이 올바른 JSON 이 아닙니다'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function sendJson(res, status, value) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(value));
+}
+
+const failure = (code, message) => ({ ok: false, error: { code, message, hint: '' } });
+
+function safeEqual(given, expected) {
+  const a = Buffer.from(String(given ?? ''));
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// /api/send 는 아무 주소로나 요청을 보내는 프록시이므로, 이 PC 의 다른 웹페이지가 쓰지 못하게
+// Host 검사(DNS 리바인딩 방지)와 페이지에만 심은 토큰 검사를 모두 통과해야 한다.
+function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index.html') }) {
+  return http.createServer(async (req, res) => {
+    try {
+      if (req.headers.host !== `127.0.0.1:${req.socket.localPort}`) return sendJson(res, 403, failure('FORBIDDEN', '허용되지 않은 Host 입니다'));
+      if (req.method === 'GET' && req.url === '/') {
+        const html = fs.readFileSync(indexFile, 'utf8').replaceAll('__TOKEN__', token);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(html);
+      }
+      if (!safeEqual(req.headers['x-token'], token)) return sendJson(res, 403, failure('FORBIDDEN', '토큰이 올바르지 않습니다'));
+
+      if (req.method === 'POST' && req.url === '/api/send') {
+        const spec = await readJson(req);
+        try {
+          return sendJson(res, 200, await sendRequest(spec));
+        } catch (err) {
+          return sendJson(res, 200, { ok: false, error: toError(err) });
+        }
+      }
+      if (req.method === 'GET' && req.url === '/api/data') return sendJson(res, 200, { ok: true, ...loadData(dataFile) });
+      if (req.method === 'PUT' && req.url === '/api/data') {
+        saveData(dataFile, await readJson(req));
+        return sendJson(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && req.url === '/api/import/postman') return sendJson(res, 200, { ok: true, ...convertPostman(await readJson(req)) });
+      return sendJson(res, 404, failure('NOT_FOUND', '없는 경로입니다'));
+    } catch (err) {
+      const status = err.code === 'TOO_LARGE' ? 413 : err instanceof RequestError ? 400 : 500;
+      return sendJson(res, status, { ok: false, error: toError(err) });
+    }
+  });
+}
+
+// Edge → Chrome 순으로 주소창 없는 앱 창을 띄운다. 둘 다 없으면 기본 브라우저로 연다.
+function openAppWindow(url) {
+  const roots = [process.env['ProgramFiles(x86)'], process.env.ProgramFiles, process.env.LOCALAPPDATA].filter(Boolean);
+  const browsers = [['Microsoft', 'Edge', 'Application', 'msedge.exe'], ['Google', 'Chrome', 'Application', 'chrome.exe']];
+  for (const parts of browsers) {
+    for (const root of roots) {
+      const exe = path.join(root, ...parts);
+      if (fs.existsSync(exe)) {
+        spawn(exe, [`--app=${url}`], { detached: true, stdio: 'ignore' }).unref();
+        return;
+      }
+    }
+  }
+  // start 의 첫 인자는 창 제목이므로 빈 문자열을 둔다.
+  spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
+}
+
+if (require.main === module) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const server = createServer({ dataFile: path.join(__dirname, 'data.json'), token });
+  server.listen(0, '127.0.0.1', () => {
+    const url = `http://127.0.0.1:${server.address().port}/`;
+    console.log(`API 클라이언트 실행 중: ${url}`);
+    console.log('이 창을 닫으면 종료됩니다.');
+    openAppWindow(url);
+  });
+}
+
+module.exports = { RequestError, substitute, buildRequest, sendRequest, toError, loadData, saveData, convertPostman, createServer };

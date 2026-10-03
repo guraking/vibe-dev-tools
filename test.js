@@ -304,3 +304,97 @@ test('convertPostman: v2 형식이 아니면 거부한다', () => {
   assert.throws(() => convertPostman({ info: { schema: 'https://schema.getpostman.com/json/collection/v1.0.0/' } }), { code: 'UNSUPPORTED_POSTMAN' });
   assert.throws(() => convertPostman(null), { code: 'UNSUPPORTED_POSTMAN' });
 });
+
+async function startApp(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'api-client-'));
+  const indexFile = path.join(dir, 'index.html');
+  fs.writeFileSync(indexFile, '<script>const TOKEN = "__TOKEN__";</script>');
+  const server = createServer({ dataFile: path.join(dir, 'data.json'), token: 'test-token', indexFile });
+  const base = await listen(server);
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  const call = (method, url, body, token = 'test-token') => fetch(base + url, {
+    method,
+    headers: { 'X-Token': token, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  return { base, call };
+}
+
+function requestWithHost(url, host) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(url, { headers: { host } }, (res) => {
+      res.resume();
+      resolve(res.statusCode);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('server: 페이지에 토큰을 넣어 준다', async (t) => {
+  const { base } = await startApp(t);
+  const html = await (await fetch(`${base}/`)).text();
+  assert.equal(html, '<script>const TOKEN = "test-token";</script>');
+});
+
+test('server: 토큰이 틀리거나 Host 가 다르면 403', async (t) => {
+  const { base, call } = await startApp(t);
+  assert.equal((await call('GET', '/api/data', undefined, 'wrong')).status, 403);
+  assert.equal(await requestWithHost(`${base}/`, 'evil.example'), 403);
+  assert.equal(await requestWithHost(`${base}/`, `localhost:${new URL(base).port}`), 403);
+});
+
+test('server: 데이터를 저장하고 다시 읽는다, 형식이 틀리면 400', async (t) => {
+  const { call } = await startApp(t);
+  const data = {
+    version: 1,
+    collections: [{ id: '1', name: 'f', type: 'folder', children: [] }],
+    environments: [],
+    activeEnvironmentId: null,
+    history: [],
+    settings: { insecure: false, timeoutMs: 30000 },
+  };
+  assert.equal((await call('PUT', '/api/data', data)).status, 200);
+  const got = await (await call('GET', '/api/data')).json();
+  assert.deepEqual(got, { ok: true, data, warning: null });
+  const bad = await call('PUT', '/api/data', [1, 2]);
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).error.code, 'INVALID_DATA');
+});
+
+test('server: /api/send 는 요청 실패도 200 과 ok:false 로 돌려준다', async (t) => {
+  const { call } = await startApp(t);
+  const ok = await (await call('POST', '/api/send', { method: 'GET', url: `${echo.base}/x` })).json();
+  assert.equal(ok.ok, true);
+  assert.equal(ok.status, 200);
+  const res = await call('POST', '/api/send', { url: '{{nope}}/x' });
+  assert.equal(res.status, 200);
+  const failed = await res.json();
+  assert.equal(failed.ok, false);
+  assert.equal(failed.error.code, 'UNDEFINED_VARIABLE');
+});
+
+test('server: 잘못된 JSON·50MB 초과 본문 뒤에도 계속 응답한다', async (t) => {
+  const { call } = await startApp(t);
+  const badJson = await call('POST', '/api/send', '{ 깨짐');
+  assert.equal(badJson.status, 400);
+  assert.equal((await badJson.json()).error.code, 'INVALID_JSON');
+  const tooLarge = await call('PUT', '/api/data', 'x'.repeat(51 * 1024 * 1024));
+  assert.equal(tooLarge.status, 413);
+  assert.equal((await call('GET', '/api/data')).status, 200);
+});
+
+test('server: Postman 가져오기', async (t) => {
+  const { call } = await startApp(t);
+  const ok = await (await call('POST', '/api/import/postman', POSTMAN_SAMPLE)).json();
+  assert.equal(ok.ok, true);
+  assert.equal(ok.collection.name, '주문 API');
+  assert.equal(ok.skipped, 3);
+  const bad = await call('POST', '/api/import/postman', { info: {} });
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).error.code, 'UNSUPPORTED_POSTMAN');
+});
