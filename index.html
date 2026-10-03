@@ -94,7 +94,8 @@
   textarea { width: 100%; min-height: 160px; font: 12px/1.6 var(--mono); resize: vertical; }
   #auth-bearer, #auth-basic { margin-top: 10px; display: flex; gap: 8px; }
   #auth-bearer input { flex: 1; font-family: var(--mono); }
-  #auth-type, #auth-bearer input, #auth-basic input { padding: 7px 10px; font-size: 13px; } /* URL 입력칸과 같은 여백 */
+  #auth-type, #auth-basic input { padding: 7px 10px; font-size: 13px; } /* URL 입력칸과 같은 여백 */
+  #auth-token { min-height: 96px; padding: 8px 10px; font-size: 13px; word-break: break-all; } /* JWT 같은 긴 토큰이 줄바꿈되어 다 보이도록 */
   #auth-type { min-width: 180px; }
   #tab-body .row label { font: 12px var(--mono); }
 
@@ -197,7 +198,7 @@
             <option value="bearer">Bearer Token</option>
             <option value="basic">Basic Auth</option>
           </select>
-          <div id="auth-bearer"><input id="auth-token" placeholder="토큰 ({{token}} 사용 가능)" spellcheck="false"></div>
+          <div id="auth-bearer"><textarea id="auth-token" rows="4" placeholder="토큰 ({{token}} 사용 가능)" spellcheck="false"></textarea></div>
           <div id="auth-basic"><input id="auth-user" placeholder="사용자"><input id="auth-pass" type="password" placeholder="비밀번호"></div>
         </div>
         <div id="tab-body" hidden>
@@ -714,7 +715,8 @@ function bindEvents() {
   $('#save').onclick = saveCurrent;
 
   $('#auth-type').onchange = (e) => { current.auth.type = e.target.value; showAuth(); };
-  $('#auth-token').oninput = (e) => { current.auth.token = e.target.value; };
+  // 헤더 값에는 줄바꿈을 넣을 수 없으므로, 붙여넣거나 Enter 로 들어간 줄바꿈은 지운다.
+  $('#auth-token').oninput = (e) => { current.auth.token = e.target.value.replace(/[\r\n]/g, ''); };
   $('#auth-user').oninput = (e) => { current.auth.username = e.target.value; };
   $('#auth-pass').oninput = (e) => { current.auth.password = e.target.value; };
   for (const radio of document.querySelectorAll('input[name=body-type]')) {
