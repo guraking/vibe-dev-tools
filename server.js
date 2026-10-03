@@ -444,6 +444,9 @@ function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index
   });
 }
 
+// 노트북 1366×768 화면에서도 작업표시줄에 가리지 않는 크기
+const APP_WINDOW_SIZE = '1280,720';
+
 // Edge → Chrome 순으로 주소창 없는 앱 창을 띄운다. 둘 다 없으면 기본 브라우저로 연다.
 function openAppWindow(url) {
   const roots = [process.env['ProgramFiles(x86)'], process.env.ProgramFiles, process.env.LOCALAPPDATA].filter(Boolean);
@@ -452,7 +455,7 @@ function openAppWindow(url) {
     for (const root of roots) {
       const exe = path.join(root, ...parts);
       if (fs.existsSync(exe)) {
-        spawn(exe, [`--app=${url}`], { detached: true, stdio: 'ignore' }).unref();
+        spawn(exe, [`--app=${url}`, `--window-size=${APP_WINDOW_SIZE}`], { detached: true, stdio: 'ignore' }).unref();
         return;
       }
     }
