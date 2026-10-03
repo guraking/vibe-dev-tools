@@ -8,6 +8,7 @@
   /* 방화벽 PC 에서 웹폰트를 받을 수 없으므로 설치된 글꼴만 순서대로 쓴다. */
   :root {
     --page: #efeee9; --panel: #fbfaf6; --field: #ffffff; --ink: #111111; --rule: #d9d7cf; --muted: #77756e;
+    --grid: rgba(17, 17, 17, .05); --backdrop: rgba(239, 238, 233, .75); --on-accent: #ffffff;
     --accent: #e5482d; --code: #2f54eb;
     --mono: "JetBrains Mono", "D2Coding", "Cascadia Mono", Consolas, monospace;
     --sans: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
@@ -15,11 +16,17 @@
     font: 13px/1.5 var(--sans);
     color: var(--ink);
   }
+  /* 다크 테마. 선·글자·하드 섀도가 모두 --ink 를 쓰므로 변수만 뒤집으면 같은 구성이 반전된다. */
+  :root[data-theme="ink"] {
+    color-scheme: dark;
+    --page: #161615; --panel: #1e1e1c; --field: #252522; --ink: #ece9e0; --rule: #3a3935; --muted: #8f8c84;
+    --accent: #ff5a3c; --code: #7c9cff; --grid: rgba(236, 233, 224, .05); --backdrop: rgba(22, 22, 21, .75);
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0; height: 100vh; display: flex; flex-direction: column;
     background-color: var(--page);
-    background-image: linear-gradient(rgba(17, 17, 17, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(17, 17, 17, .05) 1px, transparent 1px);
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 
@@ -91,7 +98,7 @@
   #res-meta { font: 12px var(--mono); letter-spacing: .04em; text-transform: none; color: var(--muted); }
   #res-meta .s2, #res-meta .s3, #res-meta .s4, #res-meta .s5 { display: inline-block; padding: 1px 8px; border: 1px solid var(--ink); color: var(--panel); background: var(--ink); }
   #res-meta .s3 { background: var(--field); color: var(--ink); }
-  #res-meta .s4, #res-meta .s5, #res-meta .error { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #res-meta .s4, #res-meta .s5, #res-meta .error { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   #res-meta .error { display: inline-block; padding: 1px 8px; }
   #response.idle #res-body::before { content: "> 응답 대기 중 "; color: var(--muted); }
   #response.idle #res-body::after { content: "\258C"; animation: blink 1s steps(1) infinite; }
@@ -107,7 +114,7 @@
   .tree span.node { display: block; padding: 4px 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; }
   .tree span.node:hover { border-color: var(--ink); }
   .tree span.node.selected { background: var(--ink); color: var(--panel); }
-  .tree span.node.selected .method { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tree span.node.selected .method { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   #side-collections .row button { flex: 1; }
 
   #history { list-style: none; margin: 0; padding: 0; }
@@ -125,7 +132,7 @@
   #menu button:hover { background: var(--ink); color: var(--panel); }
   dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--ink); border-radius: 0; box-shadow: 6px 6px 0 var(--ink); min-width: 480px; padding: 0; }
   dialog form { padding: 16px; }
-  dialog::backdrop { background: rgba(239, 238, 233, .75); }
+  dialog::backdrop { background: var(--backdrop); }
   dialog h3 { margin: -16px -16px 16px; padding: 12px 16px; border-bottom: 1px solid var(--ink); font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
   dialog label { display: block; margin-bottom: 10px; }
   dialog label input:not([type=checkbox]), dialog label select { display: block; width: 100%; margin-top: 4px; }
@@ -244,6 +251,7 @@
     <h3>설정</h3>
     <label><input type="checkbox" id="set-insecure"> SSL 인증서 검증 무시 (자체 서명 인증서를 쓰는 사내 서버용)</label>
     <label>타임아웃(초) <input type="number" id="set-timeout" min="1" max="600" required></label>
+    <label>테마 <select id="set-theme"><option value="paper">Paper</option><option value="ink">Ink (다크)</option></select></label>
     <div class="row end"><button type="button" onclick="this.closest('dialog').close('cancel')">취소</button><button value="ok" class="primary">저장</button></div>
   </form>
 </dialog>
@@ -766,6 +774,7 @@ function bindEvents() {
   $('#open-settings').onclick = () => {
     $('#set-insecure').checked = data.settings.insecure;
     $('#set-timeout').value = Math.round(data.settings.timeoutMs / 1000);
+    $('#set-theme').value = data.settings.theme || 'paper';
     $('#settings-dialog').returnValue = '';
     $('#settings-dialog').showModal();
   };
@@ -775,7 +784,8 @@ function bindEvents() {
     if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_TIMEOUT_SECONDS) {
       return toast(`타임아웃은 1~${MAX_TIMEOUT_SECONDS}초 사이 정수여야 합니다`, 'error');
     }
-    data.settings = { insecure: $('#set-insecure').checked, timeoutMs: seconds * 1000 };
+    data.settings = { insecure: $('#set-insecure').checked, timeoutMs: seconds * 1000, theme: $('#set-theme').value };
+    applyTheme();
     save();
   };
 
@@ -795,6 +805,8 @@ function bindEvents() {
   };
 }
 
+const applyTheme = () => { document.documentElement.dataset.theme = data.settings.theme || 'paper'; };
+
 async function init() {
   $('#host').textContent = location.host;
   $('#method').replaceChildren(...METHODS.map((m) => el('option', { value: m, textContent: m })));
@@ -808,6 +820,7 @@ async function init() {
   }
   // 이벤트는 data 가 있어야 동작하므로 로드에 성공한 뒤에 연결한다.
   bindEvents();
+  applyTheme();
   renderEnvSelect();
   renderHistory();
   renderEditor();
