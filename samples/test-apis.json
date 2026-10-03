@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "테스트 API 모음",
+    "description": "공개 테스트 API 로 기능을 하나씩 확인하는 컬렉션. '환경변수' 폴더는 환경에 baseUrl = https://dummyjson.com 을 만든 뒤 보낸다.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "기본",
+      "item": [
+        {
+          "name": "GET + Params",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://httpbin.org/get?page=1&q=한글",
+              "query": [{ "key": "page", "value": "1" }, { "key": "q", "value": "한글" }]
+            }
+          }
+        },
+        {
+          "name": "JSON 응답",
+          "request": { "method": "GET", "url": "https://jsonplaceholder.typicode.com/posts/1" }
+        },
+        {
+          "name": "Postman 에코",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Test", "value": "vibe-dev-tools" }],
+            "url": { "raw": "https://postman-echo.com/get?a=1", "query": [{ "key": "a", "value": "1" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "본문",
+      "item": [
+        {
+          "name": "JSON 본문",
+          "request": {
+            "method": "POST",
+            "url": "https://httpbin.org/post",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"이정민\",\n  \"role\": \"PLM\"\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "form-data (파일은 Body 탭에서 추가)",
+          "request": {
+            "method": "POST",
+            "url": "https://httpbin.org/post",
+            "body": { "mode": "formdata", "formdata": [{ "key": "memo", "value": "텍스트 필드", "type": "text" }] }
+          }
+        },
+        {
+          "name": "urlencoded",
+          "request": {
+            "method": "POST",
+            "url": "https://httpbin.org/post",
+            "body": { "mode": "urlencoded", "urlencoded": [{ "key": "id", "value": "42" }, { "key": "name", "value": "vibe" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "인증",
+      "item": [
+        {
+          "name": "Bearer (토큰 있으면 200)",
+          "request": {
+            "method": "GET",
+            "url": "https://httpbin.org/bearer",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "test-token-123", "type": "string" }] }
+          }
+        },
+        {
+          "name": "Basic (user / pass)",
+          "request": {
+            "method": "GET",
+            "url": "https://httpbin.org/basic-auth/user/pass",
+            "auth": { "type": "basic", "basic": [{ "key": "username", "value": "user" }, { "key": "password", "value": "pass" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "응답 처리",
+      "item": [
+        { "name": "404 상태", "request": { "method": "GET", "url": "https://httpbin.org/status/404" } },
+        { "name": "3초 지연 (타임아웃 2초로 시험)", "request": { "method": "GET", "url": "https://httpbin.org/delay/3" } },
+        { "name": "gzip 응답", "request": { "method": "GET", "url": "https://httpbin.org/gzip" } },
+        { "name": "자체 서명 인증서 (SSL 검증 무시 시험)", "request": { "method": "GET", "url": "https://self-signed.badssl.com/" } }
+      ]
+    },
+    {
+      "name": "환경변수",
+      "item": [
+        { "name": "{{baseUrl}} 상품 1개", "request": { "method": "GET", "url": "{{baseUrl}}/products/1" } }
+      ]
+    }
+  ]
+}
