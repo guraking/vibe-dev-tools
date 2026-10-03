@@ -254,6 +254,7 @@ const TOKEN = '__TOKEN__';
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const HISTORY_LIMIT = 100;     // 스펙: 히스토리는 최근 100건만 유지
 const MAX_TIMEOUT_SECONDS = 600;
+const PING_INTERVAL_MS = 20 * 1000; // 서버는 90초 동안 신호가 없으면 창이 닫힌 것으로 보고 종료한다
 
 const $ = (selector) => document.querySelector(selector);
 function el(tag, props = {}, ...children) {
@@ -810,6 +811,7 @@ async function init() {
   renderEnvSelect();
   renderHistory();
   renderEditor();
+  setInterval(() => api('POST', '/api/ping', {}).catch(() => {}), PING_INTERVAL_MS);
 }
 
 init();

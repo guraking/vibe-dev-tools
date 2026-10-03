@@ -451,3 +451,17 @@ test('sendRequest: charset 에 맞춰 디코딩하고 gzip 압축을 푼다', as
   assert.equal((await sendRequest({ url: `${base}/euckr` })).body, '한글');
   assert.equal((await sendRequest({ url: `${base}/gzip` })).body, '{"a":"가"}');
 });
+
+test('server: /api/ping 은 마지막 신호 시각을 갱신한다', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'api-client-'));
+  const server = createServer({ dataFile: path.join(dir, 'data.json'), token: 'test-token' });
+  const base = await listen(server);
+  t.after(() => { server.closeAllConnections(); server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  assert.equal(typeof server.lastPing, 'number');
+  const before = server.lastPing;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const res = await fetch(`${base}/api/ping`, { method: 'POST', headers: { 'X-Token': 'test-token' } });
+  assert.equal(res.status, 200);
+  assert.ok(server.lastPing > before);
+  assert.equal((await fetch(`${base}/api/ping`, { method: 'POST' })).status, 403);
+});

@@ -412,7 +412,7 @@ function safeEqual(given, expected) {
 // /api/send 는 아무 주소로나 요청을 보내는 프록시이므로, 이 PC 의 다른 웹페이지가 쓰지 못하게
 // Host 검사(DNS 리바인딩 방지)와 페이지에만 심은 토큰 검사를 모두 통과해야 한다.
 function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index.html') }) {
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     try {
       if (req.headers.host !== `127.0.0.1:${req.socket.localPort}`) return sendJson(res, 403, failure('FORBIDDEN', '허용되지 않은 Host 입니다'));
       if (req.method === 'GET' && req.url === '/') {
@@ -430,6 +430,10 @@ function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index
           return sendJson(res, 200, { ok: false, error: toError(err) });
         }
       }
+      if (req.method === 'POST' && req.url === '/api/ping') {
+        server.lastPing = Date.now();
+        return sendJson(res, 200, { ok: true });
+      }
       if (req.method === 'GET' && req.url === '/api/data') return sendJson(res, 200, { ok: true, ...loadData(dataFile) });
       if (req.method === 'PUT' && req.url === '/api/data') {
         saveData(dataFile, await readJson(req));
@@ -442,6 +446,9 @@ function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index
       return sendJson(res, status, { ok: false, error: toError(err) });
     }
   });
+  // 앱 창이 /api/ping 을 마지막으로 보낸 시각. 창이 한 번도 열리지 않은 경우를 위해 시작 시각으로 초기화한다.
+  server.lastPing = Date.now();
+  return server;
 }
 
 // 노트북 1366×768 화면에서도 작업표시줄에 가리지 않는 크기
@@ -464,7 +471,15 @@ function openAppWindow(url) {
   spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
 }
 
-if (require.main === module) {
+// 창을 최소화하고 5분이 지나면 Edge 가 타이머를 1분에 한 번으로 줄이므로, 종료 기준은 1분보다 넉넉히 잡는다.
+const IDLE_LIMIT_MS = 90 * 1000;
+const IDLE_CHECK_MS = 10 * 1000;
+
+if (require.main === module && process.argv.includes('--background')) {
+  // 콘솔 없는 자식 프로세스로 다시 띄우고 바로 끝낸다. 화면이 없으므로 자식의 출력과 오류는 server.log 에 남긴다.
+  const log = fs.openSync(path.join(__dirname, 'server.log'), 'a');
+  spawn(process.execPath, [__filename], { detached: true, windowsHide: true, stdio: ['ignore', log, log] }).unref();
+} else if (require.main === module) {
   const token = crypto.randomBytes(24).toString('hex');
   const server = createServer({ dataFile: path.join(__dirname, 'data.json'), token });
   server.listen(0, '127.0.0.1', () => {
@@ -473,6 +488,10 @@ if (require.main === module) {
     console.log('이 창을 닫으면 종료됩니다.');
     openAppWindow(url);
   });
+  // 앱 창이 신호를 보내지 않은 지 IDLE_LIMIT_MS 가 지나면 창이 닫힌 것으로 보고 종료한다.
+  setInterval(() => {
+    if (Date.now() - server.lastPing > IDLE_LIMIT_MS) process.exit(0);
+  }, IDLE_CHECK_MS);
 }
 
 module.exports = { RequestError, substitute, buildRequest, sendRequest, toError, loadData, saveData, convertPostman, createServer };
