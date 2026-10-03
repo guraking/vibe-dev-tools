@@ -248,6 +248,17 @@ const postmanRows = (list) => (Array.isArray(list) ? list : []).map((x) => ({ ke
 // v2.1 은 [{ key, value }] 배열, v2.0 은 { key: value } 객체로 인증 값을 담는다.
 const postmanAuthValue = (values, key) => (Array.isArray(values) ? values.find((x) => x.key === key)?.value : values?.[key]) ?? '';
 
+// Postman 은 쿼리를 입력한 그대로(이미 퍼센트 인코딩된 상태로) 저장한다. 전송 때 buildRequest 가 다시 인코딩하므로 여기서 풀어 둔다.
+const decodeQuery = (text) => {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+};
+
+const decodeRows = (rows) => rows.map((row) => ({ ...row, key: decodeQuery(row.key), value: decodeQuery(row.value) }));
+
 function parseQuery(query) {
   return query.split('&').filter(Boolean).map((pair) => {
     const i = pair.indexOf('=');
@@ -260,25 +271,28 @@ function convertPostman(json) {
   if (!POSTMAN_SCHEMA.test(json?.info?.schema || '')) {
     throw new RequestError('UNSUPPORTED_POSTMAN', 'Postman Collection v2.0 / v2.1 형식만 가져올 수 있습니다', 'Postman 에서 Export → Collection v2.1 로 내보내세요');
   }
-  const state = { skipped: 0 };
-  const collection = convertPostmanFolder(json.info.name || 'Postman', json, state);
+  // 컬렉션 변수는 가져오지 않는다. 환경 편집에서 같은 이름으로 직접 만들어야 한다.
+  const state = { skipped: (json.variable || []).length };
+  const collection = convertPostmanFolder(json.info.name || 'Postman', json, state, null);
   return { collection, skipped: state.skipped };
 }
 
-function convertPostmanFolder(name, folder, state) {
+// 인증이 없는 요청은 가장 가까운 상위 폴더(또는 컬렉션)의 인증을 쓴다. Postman 의 "Inherit auth from parent" 와 같다.
+function convertPostmanFolder(name, folder, state, inheritedAuth) {
   state.skipped += (folder.event || []).length;
+  const auth = folder.auth ?? inheritedAuth;
   const children = (folder.item || []).map((child) => (Array.isArray(child.item)
-    ? convertPostmanFolder(child.name || '폴더', child, state)
-    : convertPostmanItem(child, state)));
+    ? convertPostmanFolder(child.name || '폴더', child, state, auth)
+    : convertPostmanItem(child, state, auth)));
   return { id: crypto.randomUUID(), name, type: 'folder', children };
 }
 
-function convertPostmanItem(item, state) {
+function convertPostmanItem(item, state, inheritedAuth) {
   state.skipped += (item.event || []).length;
-  return { id: crypto.randomUUID(), name: item.name || '요청', type: 'request', request: convertPostmanRequest(item.request, state) };
+  return { id: crypto.randomUUID(), name: item.name || '요청', type: 'request', request: convertPostmanRequest(item.request, state, inheritedAuth) };
 }
 
-function convertPostmanRequest(source, state) {
+function convertPostmanRequest(source, state, inheritedAuth) {
   const request = blankRequest();
   // v2.0 은 request 자리에 URL 문자열만 둘 수 있다.
   const r = typeof source === 'string' ? { url: source } : source;
@@ -288,10 +302,10 @@ function convertPostmanRequest(source, state) {
   const raw = typeof r.url === 'string' ? r.url : r.url?.raw || '';
   const q = raw.indexOf('?');
   request.url = q < 0 ? raw : raw.slice(0, q);
-  request.params = r.url && typeof r.url === 'object' ? postmanRows(r.url.query) : parseQuery(q < 0 ? '' : raw.slice(q + 1));
+  request.params = decodeRows(r.url && typeof r.url === 'object' ? postmanRows(r.url.query) : parseQuery(q < 0 ? '' : raw.slice(q + 1)));
   request.headers = postmanRows(r.header);
 
-  const auth = r.auth;
+  const auth = r.auth ?? inheritedAuth;
   if (auth?.type === 'bearer') {
     request.auth.type = 'bearer';
     request.auth.token = postmanAuthValue(auth.bearer, 'token');

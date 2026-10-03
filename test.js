@@ -398,3 +398,34 @@ test('server: Postman 가져오기', async (t) => {
   assert.equal(bad.status, 400);
   assert.equal((await bad.json()).error.code, 'UNSUPPORTED_POSTMAN');
 });
+
+test('convertPostman: 이미 인코딩된 쿼리 값은 풀어서 가져와 이중 인코딩되지 않는다', async () => {
+  const { collection } = convertPostman({
+    info: { name: 'q', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+    item: [{ name: 'r', request: { method: 'GET', url: { raw: 'http://h/a?d=2024-01-01T00%3A00', query: [{ key: 'd', value: '2024-01-01T00%3A00' }] } } }],
+  });
+  const { request } = collection.children[0];
+  assert.deepEqual(request.params, [{ key: 'd', value: '2024-01-01T00:00', enabled: true }]);
+  const built = await buildRequest({ ...request, variables: {} });
+  assert.equal(built.url.search, '?d=2024-01-01T00%3A00');
+});
+
+test('convertPostman: 폴더·컬렉션 인증을 상속하고, 컬렉션 변수는 건너뛴 항목으로 센다', () => {
+  const { collection, skipped } = convertPostman({
+    info: { name: 'auth', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+    auth: { type: 'bearer', bearer: [{ key: 'token', value: 'root' }] },
+    variable: [{ key: 'baseUrl', value: 'http://h' }],
+    item: [
+      { name: 'inherit', request: { method: 'GET', url: 'http://h/a' } },
+      { name: 'f', auth: { type: 'basic', basic: [{ key: 'username', value: 'u' }, { key: 'password', value: 'p' }] }, item: [
+        { name: 'folder-auth', request: { method: 'GET', url: 'http://h/b' } },
+        { name: 'own', request: { method: 'GET', url: 'http://h/c', auth: { type: 'noauth' } } },
+      ] },
+    ],
+  });
+  const [inherit, folder] = collection.children;
+  assert.equal(inherit.request.auth.token, 'root');
+  assert.equal(folder.children[0].request.auth.type, 'basic');
+  assert.equal(folder.children[1].request.auth.type, 'none');
+  assert.equal(skipped, 1);
+});
