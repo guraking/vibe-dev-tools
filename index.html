@@ -300,6 +300,7 @@ let current = blankRequest(); // 편집 중인 요청
 let currentId = null;        // 컬렉션에서 연 요청 노드 id. 새 요청·히스토리에서 연 요청은 null
 const collapsed = new Set(); // 접힌 폴더 id. 화면 상태라 저장하지 않는다
 let savedSnapshot = JSON.stringify(current); // 마지막으로 열거나 저장한 요청. 다르면 저장하지 않은 변경이 있다
+let openedCount = 0; // 요청을 열 때마다 1 증가. 응답을 기다리는 동안 다른 요청을 열었는지 판단한다
 
 async function api(method, url, body) {
   const res = await fetch(url, {
@@ -468,7 +469,17 @@ function openRequest(request, id) {
   current = normalize(structuredClone(request));
   savedSnapshot = JSON.stringify(current);
   currentId = id;
+  openedCount += 1;
+  resetResponse();
   renderEditor();
+}
+
+// 다른 요청을 열면 이전 요청의 응답이 남아 헷갈리지 않도록 응답 영역을 처음 상태로 되돌린다.
+function resetResponse() {
+  $('#response').classList.add('idle');
+  $('#res-meta').textContent = '';
+  $('#res-body').textContent = '';
+  $('#res-headers').replaceChildren();
 }
 
 function activeVariables() {
@@ -485,6 +496,7 @@ function withoutFiles(request) {
 }
 
 async function sendCurrent() {
+  const opened = openedCount;
   const button = $('#send');
   button.disabled = true;
   $('#response').classList.remove('idle');
@@ -498,7 +510,7 @@ async function sendCurrent() {
     result = { ok: false, error: { code: '', message: err.message, hint: '' } };
   }
   button.disabled = false;
-  showResponse(result);
+  if (opened === openedCount) showResponse(result); // 기다리는 동안 다른 요청을 열었으면 화면에는 띄우지 않는다
   data.history.unshift({
     at: new Date().toISOString(),
     request: withoutFiles(current),
