@@ -78,10 +78,14 @@
   .panel-title.tabs { gap: 10px; align-items: center; }
   .tabs button {
     border: 0; box-shadow: none; background: none; padding: 0 12px; min-height: 40px;
-    color: var(--muted); letter-spacing: .12em; text-transform: uppercase; border-bottom: 2px solid transparent;
+    color: var(--muted); letter-spacing: .12em; text-transform: uppercase;
   }
   .tabs button:active { transform: none; }
-  .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .tabs button.active { color: var(--accent); }
+  /* 대괄호 자리는 모든 탭에 잡아두고 선택된 탭에서만 보이게 해, 탭을 바꿔도 글자가 밀리지 않는다 */
+  .tabs button::before { content: "["; visibility: hidden; }
+  .tabs button::after { content: "]"; visibility: hidden; }
+  .tabs button.active::before, .tabs button.active::after { visibility: visible; }
   #req-tabs { padding: 0 6px; border-bottom: 1px solid var(--rule); }
 
   .urlbar { display: flex; gap: 8px; align-items: center; padding: 14px; border-bottom: 1px solid var(--rule); }
