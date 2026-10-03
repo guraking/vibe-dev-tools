@@ -4,6 +4,7 @@ const http = require('node:http');
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
@@ -451,8 +452,11 @@ function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index
   return server;
 }
 
-// 노트북 1366×768 화면에서도 작업표시줄에 가리지 않는 크기
-const APP_WINDOW_SIZE = '1280,720';
+// 첫 실행 때의 앱 창 크기(너비,높이). 사용자가 직접 맞춘 크기 기준이다.
+const APP_WINDOW_SIZE = '1250,910';
+// 이미 실행 중인 Edge 에 창을 맡기면 --window-size 가 무시되므로, 이 도구 전용 프로필로 별도 프로세스를 띄운다.
+// 프로필은 수십 MB 라 USB 가 아닌 이 PC 에 둔다. 사용자가 바꾼 창 크기도 이 프로필이 기억한다.
+const APP_PROFILE_DIR = path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'vibe-dev-tools', 'browser-profile');
 
 // Edge → Chrome 순으로 주소창 없는 앱 창을 띄운다. 둘 다 없으면 기본 브라우저로 연다.
 function openAppWindow(url) {
@@ -462,7 +466,7 @@ function openAppWindow(url) {
     for (const root of roots) {
       const exe = path.join(root, ...parts);
       if (fs.existsSync(exe)) {
-        spawn(exe, [`--app=${url}`, `--window-size=${APP_WINDOW_SIZE}`], { detached: true, stdio: 'ignore' }).unref();
+        spawn(exe, [`--app=${url}`, `--window-size=${APP_WINDOW_SIZE}`, `--user-data-dir=${APP_PROFILE_DIR}`, '--no-first-run'], { detached: true, stdio: 'ignore' }).unref();
         return;
       }
     }
