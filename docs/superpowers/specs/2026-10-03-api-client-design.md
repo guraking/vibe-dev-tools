@@ -99,7 +99,7 @@ vibe-dev-tools/
 
 ### `GET /api/data`, `PUT /api/data`
 
-`data.json` 전체를 읽고 쓴다.
+`data.json` 전체를 읽고 쓴다. GET 응답은 `{ "ok": true, "data": <아래 구조>, "warning": null | "손상 파일 보관 안내" }`, PUT 본문은 아래 구조 그대로.
 ```json
 {
   "version": 1,
@@ -111,7 +111,8 @@ vibe-dev-tools/
 }
 ```
 - 컬렉션의 요청 노드는 `{ "id", "name", "type": "request", "request": <send 요청 본문에서 variables·settings 를 뺀 것> }`.
-- 히스토리 100건 제한은 화면에서 적용 후 저장.
+- 히스토리 100건 제한은 화면에서 적용 후 저장. 히스토리에는 첨부 파일 내용(`fileBase64`)을 남기지 않는다.
+- `request.url` 은 쿼리스트링을 뺀 부분이고, 쿼리는 `params` 로 보낸다. 서버는 `params` 를 URL 뒤에 붙인다.
 
 ### `POST /api/import/postman`
 
@@ -138,6 +139,8 @@ Postman 가져오기:
 보안:
 - `127.0.0.1` 에만 바인딩.
 - 토큰 불일치 403.
+- `Host` 헤더가 `127.0.0.1:<포트>` 가 아니면 페이지 포함 모든 요청 403 (DNS 리바인딩으로 토큰이 새는 것 방지).
+- 요청 본문 50MB 초과 413, JSON 이 아니면 400. 서버는 계속 동작한다.
 
 ## 테스트
 
