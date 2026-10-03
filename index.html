@@ -13,29 +13,31 @@
   @font-face { font-family: "JetBrains Mono"; src: url("/fonts/JetBrainsMono-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
   @font-face { font-family: "D2Coding"; src: url("/fonts/D2Coding.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 
-  /* White (기본) */
+  /* White (기본). 색 구성은 Postman 신형 UI 를 따른다: 파란 보내기 버튼, 주황 탭 밑줄, 테두리 대신 면 색으로 영역 구분. */
   :root {
-    --bg: #ffffff; --surface: #fafafa; --field: #ffffff; --border: #e5e5e5; --border-strong: #d4d4d8;
-    --text: #18181b; --muted: #71717a; --hover: #f4f4f5; --selected: #ececee;
-    --accent: #2563eb; --accent-hover: #1d4ed8; --on-accent: #ffffff; --ring: rgba(37, 99, 235, .2);
-    --danger: #dc2626; --ok: #15803d; --ok-bg: #dcfce7; --warn: #a16207; --warn-bg: #fef9c3; --err-bg: #fee2e2;
-    --m-get: #16a34a; --m-post: #d97706; --m-put: #2563eb; --m-patch: #9333ea; --m-delete: #dc2626;
-    --json-key: #7c3aed; --json-str: #15803d; --json-num: #1d4ed8;
-    --shadow: 0 8px 24px rgba(0, 0, 0, .12); --backdrop: rgba(0, 0, 0, .3); --scroll: #d4d4d8;
+    --bg: #ffffff; --surface: #f9f9f9; --field: #ffffff; --border: #e6e6e6; --border-strong: #c7c7c7;
+    --text: #212121; --muted: #6b6b6b; --hover: #f2f2f2; --selected: #ebebeb;
+    --button: #f2f2f2; --button-hover: #e6e6e6;
+    --accent: #0265d2; --accent-hover: #0053b8; --on-accent: #ffffff; --ring: rgba(2, 101, 210, .2); --brand: #ff6c37;
+    --danger: #d4261c; --ok: #007f31; --ok-bg: #e5f5eb; --warn: #ad7a03; --warn-bg: #fdf3d8; --err-bg: #fde8e7;
+    --m-get: #007f31; --m-post: #ad7a03; --m-put: #0053b8; --m-patch: #623497; --m-delete: #8e1a10;
+    --json-key: #a01d8f; --json-str: #0b7a3e; --json-num: #0053b8;
+    --shadow: 0 8px 24px rgba(0, 0, 0, .12); --backdrop: rgba(0, 0, 0, .3); --scroll: #d1d1d1;
     --mono: "JetBrains Mono", "D2Coding", monospace; /* 영문은 JetBrains Mono, 그 폰트에 없는 한글은 D2Coding 이 맡는다 */
-    --sans: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    --sans: var(--mono);
     font: 13px/1.5 var(--sans);
     color: var(--text);
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #18181b; --surface: #1f1f23; --field: #18181b; --border: #2e2e33; --border-strong: #3f3f46;
-    --text: #e4e4e7; --muted: #a1a1aa; --hover: #27272a; --selected: #303036;
-    --accent: #3b82f6; --accent-hover: #2563eb; --ring: rgba(59, 130, 246, .3);
-    --danger: #f87171; --ok: #4ade80; --ok-bg: rgba(74, 222, 128, .12); --warn: #facc15; --warn-bg: rgba(250, 204, 21, .12); --err-bg: rgba(248, 113, 113, .12);
-    --m-get: #4ade80; --m-post: #fbbf24; --m-put: #60a5fa; --m-patch: #c084fc; --m-delete: #f87171;
-    --json-key: #c4b5fd; --json-str: #86efac; --json-num: #93c5fd;
-    --shadow: 0 8px 24px rgba(0, 0, 0, .5); --backdrop: rgba(0, 0, 0, .5); --scroll: #3f3f46;
+    --bg: #212121; --surface: #1a1a1a; --field: #212121; --border: #333333; --border-strong: #4d4d4d;
+    --text: #e6e6e6; --muted: #a6a6a6; --hover: #2b2b2b; --selected: #333333;
+    --button: #303030; --button-hover: #3b3b3b;
+    --accent: #097bed; --accent-hover: #0265d2; --ring: rgba(9, 123, 237, .3);
+    --danger: #f47a6f; --ok: #6bdd9a; --ok-bg: rgba(107, 221, 154, .12); --warn: #ffe47e; --warn-bg: rgba(255, 228, 126, .12); --err-bg: rgba(244, 122, 111, .12);
+    --m-get: #6bdd9a; --m-post: #ffe47e; --m-put: #74aef6; --m-patch: #c0a8e1; --m-delete: #f79a8e;
+    --json-key: #e9a1df; --json-str: #8fdcae; --json-num: #8cc2ff;
+    --shadow: 0 8px 24px rgba(0, 0, 0, .5); --backdrop: rgba(0, 0, 0, .5); --scroll: #444444;
   }
   * { box-sizing: border-box; }
   body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
@@ -45,32 +47,50 @@
 
   /* 공통 컨트롤 */
   button, select, input, textarea, label.button { font: inherit; color: inherit; }
-  input, select, textarea { background: var(--field); border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; }
+  input, select, textarea { background-color: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 5px 9px; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
-  input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+  /* 화살표는 두 테마 모두에서 보이는 중간 회색으로 그린다 */
+  select {
+    appearance: none; padding-right: 28px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 14px;
+  }
+  input[type=checkbox], input[type=radio] {
+    appearance: none; flex: none; width: 14px; height: 14px; margin: 0; padding: 0; vertical-align: middle; cursor: pointer;
+    border: 1px solid var(--border-strong); border-radius: 3px; background: var(--field);
+  }
+  input[type=checkbox]:checked {
+    border-color: var(--accent); background: var(--accent) no-repeat center / 10px
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
+  input[type=radio] { border-radius: 50%; }
+  input[type=radio]:checked { border: 4px solid var(--accent); }
   button, label.button {
     display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; cursor: pointer; white-space: nowrap;
-    background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-weight: 500;
+    background: var(--button); border: 1px solid transparent; border-radius: 4px; font-weight: 500;
   }
-  button:hover, label.button:hover { background: var(--hover); }
+  button:hover, label.button:hover { background: var(--button-hover); }
+  button:focus-visible, label.button:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
   button:disabled { opacity: .5; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button.primary { background: var(--accent); color: var(--on-accent); }
   button.primary:hover { background: var(--accent-hover); }
   .icon-btn { width: 30px; padding: 0; justify-content: center; }
   .spacer { flex: 1; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .row.end { justify-content: flex-end; margin: 20px 0 0; }
 
-  /* 상단 바 */
-  #topbar { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  /* 상단 바: 버튼은 테두리·배경 없이 두고 마우스를 올릴 때만 배경을 깐다 */
+  #topbar { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
   #brand { font-weight: 600; font-size: 14px; }
-  #host { font: 12px var(--mono); color: var(--muted); }
-  #topbar label.env { display: flex; align-items: center; gap: 6px; color: var(--muted); }
-  #topbar label.env select { color: var(--text); min-width: 140px; }
+  #host { margin-left: 4px; font: 12px var(--mono); color: var(--muted); }
+  #topbar button, #topbar label.button { background: none; color: var(--muted); }
+  #topbar button:hover, #topbar label.button:hover { background: var(--hover); color: var(--text); }
+  #topbar label.env { display: flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--muted); }
+  #topbar label.env select { height: 30px; min-width: 150px; color: var(--text); }
 
-  /* 레이아웃: 사이드바 | 손잡이 | 작업 영역 */
-  #app { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--sidebar-width, 280px) 6px 1fr; }
-  aside { display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
+  /* 레이아웃: 아이콘 레일 | 사이드바 | 손잡이 | 작업 영역. 저장된 사이드바 너비에는 레일이 들어가지 않는다 */
+  #app { flex: 1; min-height: 0; display: grid; grid-template-columns: 64px var(--sidebar-width, 280px) 6px 1fr; }
+  aside { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); }
   /* 손잡이는 평소 1px 경계선으로 보이고, 올리거나 끄는 동안 포인트 색으로 두꺼워진다. */
   #splitter { cursor: col-resize; background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat; }
   #splitter:hover, #splitter.dragging { background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat; }
@@ -79,50 +99,110 @@
   .pane { padding: 12px 16px; overflow: auto; }
   aside .pane { flex: 1; padding: 8px; }
 
-  /* 탭: 선택된 탭에 옅은 배경을 깐 알약 모양 */
-  .tabs { display: flex; align-items: center; gap: 2px; }
-  .tabs button { height: 28px; padding: 0 10px; border: 0; background: none; color: var(--muted); }
-  .tabs button:hover { background: var(--hover); color: var(--text); }
-  .tabs button.active { background: var(--selected); color: var(--text); }
-  #side-tabs { padding: 8px; border-bottom: 1px solid var(--border); }
-  #side-tabs button { flex: 1; justify-content: center; }
-  #req-tabs { padding: 0 12px 8px; }
+  /* 탭: 글자만 두고 선택된 탭 아래에 주황 밑줄 */
+  .tabs { display: flex; align-items: center; gap: 4px; }
+  .tabs button { height: 36px; padding: 0 8px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); }
+  .tabs button:hover { background: none; color: var(--text); }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--brand); }
+  #req-tabs { padding: 0 16px; border-bottom: 1px solid var(--border); }
 
-  /* 요청 */
+  /* 왼쪽 아이콘 레일: 아이콘 아래 짧은 이름, 선택된 칸에 배경 */
+  #side-tabs { flex-direction: column; padding: 8px 6px; gap: 2px; background: var(--surface); border-right: 1px solid var(--border); }
+  #side-tabs button { flex-direction: column; justify-content: center; gap: 4px; width: 100%; height: 54px; padding: 0; border: 0; border-radius: 6px; font-size: 11px; }
+  #side-tabs button:hover { background: var(--hover); }
+  #side-tabs button.active { background: var(--selected); color: var(--text); }
+
+  /* 요청: 메서드와 URL 을 테두리 하나로 묶고, 메서드는 색 글자로 보인다 */
   #request { display: flex; flex-direction: column; max-height: 55vh; border-bottom: 1px solid var(--border); }
   .urlbar { display: flex; gap: 8px; align-items: center; padding: 12px 16px; }
-  .urlbar select { font: 600 12px var(--mono); height: 34px; }
-  .urlbar input { flex: 1; min-width: 0; height: 34px; font: 13px var(--mono); }
-  .urlbar button { height: 34px; }
-  #request-pane { flex: 1; min-height: 0; padding-top: 4px; }
+  .url-field { flex: 1; min-width: 0; display: flex; align-items: center; height: 36px; border: 1px solid var(--border); border-radius: 4px; background: var(--field); }
+  .url-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+  .url-field select, .url-field input { height: 100%; border: 0; background-color: transparent; box-shadow: none; }
+  .url-field select { flex: none; padding: 0 28px 0 12px; border-right: 1px solid var(--border); border-radius: 4px 0 0 4px; font: 600 12px var(--mono); }
+  .url-field input { flex: 1; min-width: 0; font: 13px var(--mono); }
+  .url-field select:focus, .url-field input:focus { box-shadow: none; }
+  #method[data-method=GET] { color: var(--m-get); } #method[data-method=POST] { color: var(--m-post); } #method[data-method=PUT] { color: var(--m-put); }
+  #method[data-method=PATCH] { color: var(--m-patch); } #method[data-method=DELETE] { color: var(--m-delete); }
+  #method option { color: var(--text); }
+  .urlbar button { height: 36px; }
+  #send { padding: 0 20px; }
+  #request-pane { flex: 1; min-height: 0; }
+
+  /* key/value 표: 얇은 격자선 안에 테두리 없는 입력칸. 삭제 버튼은 줄에 마우스를 올릴 때 보인다 */
   table.kv { width: 100%; border-collapse: collapse; }
-  table.kv td { padding: 2px; vertical-align: middle; }
-  table.kv td:first-child { width: 28px; text-align: center; }
-  table.kv input:not([type=checkbox]), table.kv select { width: 100%; font: 12px var(--mono); }
-  table.kv button { height: 26px; width: 26px; padding: 0; justify-content: center; border-color: transparent; background: none; color: var(--muted); }
+  table.kv td { height: 32px; padding: 0; border: 1px solid var(--border); vertical-align: middle; }
+  table.kv td:first-child, table.kv td:last-child { width: 32px; text-align: center; }
+  table.kv input:not([type=checkbox]), table.kv select { width: 100%; height: 30px; border: 0; border-radius: 0; background-color: transparent; padding: 0 10px; font: 12px var(--mono); }
+  table.kv select { padding-right: 28px; }
+  table.kv input:not([type=checkbox]):focus, table.kv select:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+  table.kv input[type=file] { width: auto; padding: 5px 10px; font-family: var(--sans); }
+  table.kv button { height: 24px; width: 24px; padding: 0; justify-content: center; background: none; color: var(--muted); opacity: 0; }
+  table.kv tr:hover button, table.kv button:focus-visible { opacity: 1; }
   table.kv button:hover { background: var(--hover); color: var(--danger); }
   textarea { width: 100%; min-height: 160px; font: 12px/1.6 var(--mono); resize: vertical; }
   #auth-type { min-width: 180px; height: 32px; }
   #auth-bearer, #auth-basic { margin-top: 10px; display: flex; gap: 8px; }
   #auth-basic input { height: 32px; }
   #auth-token { min-height: 96px; padding: 8px 10px; font-size: 13px; word-break: break-all; } /* JWT 같은 긴 토큰이 줄바꿈되어 다 보이도록 */
-  #tab-body .row label { display: inline-flex; align-items: center; gap: 4px; }
+  #tab-body .row { gap: 16px; }
+  #tab-body .row label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 
   /* 응답 */
   #response { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .res-head { padding: 8px 16px; border-bottom: 1px solid var(--border); gap: 10px; }
+  .res-head { padding: 0 16px; border-bottom: 1px solid var(--border); gap: 10px; }
   .res-head .title { font-weight: 600; color: var(--text); }
   #res-meta { font: 12px var(--mono); color: var(--muted); }
   #response > .pane { flex: 1; min-height: 0; }
-  #response.idle #res-body::before { content: "요청을 보내면 응답이 여기에 표시됩니다"; font-family: var(--sans); color: var(--muted); }
+  /* 응답 전: 가운데에 보내기 아이콘과 안내 문구 */
+  #response.idle #res-body-pane { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  #response.idle #res-body-pane::before {
+    content: ""; width: 48px; height: 48px; background: var(--border-strong);
+    -webkit-mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z'/%3E%3Cpath d='m21.854 2.147-10.94 10.939'/%3E%3C/svg%3E");
+  }
+  #response.idle #res-body::before { content: "URL을 입력하고 보내기를 누르세요"; font: 13px var(--sans); color: var(--muted); }
   pre { margin: 0; font: 12px/1.65 var(--mono); white-space: pre-wrap; word-break: break-all; }
   .j-key { color: var(--json-key); } .j-str { color: var(--json-str); } .j-num { color: var(--json-num); } .j-lit { color: var(--muted); }
   #res-headers { border-collapse: collapse; width: 100%; }
-  #res-headers td { font: 12px var(--mono); padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  #res-headers td { font: 12px var(--mono); padding: 6px 10px; border: 1px solid var(--border); vertical-align: top; }
   #res-headers td:first-child { color: var(--muted); white-space: nowrap; }
 
+  /* 요청 경로 흐름도. 마지막 선과 대상 노드는 상태(--flow)에 따라 색과 모양이 바뀐다:
+     st-pending 보내는 중(점선이 흐름), st-2 성공(초록, 잠깐 흐름), st-3 리다이렉트(노랑), st-4 클라이언트 오류(주황), st-5 서버 오류(빨강), st-fail 연결 실패(끊긴 점선 + ✕, 대상 흐리게) */
+  #res-flow { --flow: var(--muted); display: flex; align-items: center; margin-top: 28px; padding: 20px 4px; }
+  #res-flow:empty { display: none; }
+  #res-flow.st-2 { --flow: var(--ok); }
+  #res-flow.st-3 { --flow: var(--warn); }
+  #res-flow.st-4 { --flow: var(--brand); }
+  #res-flow.st-5, #res-flow.st-fail { --flow: var(--danger); }
+  .flow-node { position: relative; flex: none; display: flex; align-items: center; gap: 10px; min-width: 150px; max-width: 260px; padding: 10px 14px 10px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+  .flow-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--hover); color: var(--muted); }
+  .flow-text { display: flex; flex-direction: column; min-width: 0; font-size: 11px; color: var(--muted); }
+  .flow-text strong { color: var(--text); font-size: 13px; font-weight: 600; }
+  .flow-text strong, .flow-text span { overflow-wrap: anywhere; }
+  .flow-target .flow-icon { color: var(--flow); background: color-mix(in srgb, var(--flow) 14%, transparent); }
+  .flow-target::after { content: ""; position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--flow); box-shadow: 0 0 0 3px var(--bg); }
+  .st-4 .flow-target, .st-5 .flow-target { border-color: var(--flow); }
+  .st-fail .flow-target { border: 1px dashed var(--flow); opacity: .65; animation: flow-shake .4s; }
+
+  .flow-edge { --line: var(--accent); flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 6px; }
+  .flow-edge.flow-last { --line: var(--flow); }
+  .chip { max-width: 100%; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip:empty { visibility: hidden; }
+  .flow-last .chip:last-child { color: var(--line); border-color: color-mix(in srgb, var(--line) 45%, transparent); }
+  .flow-edge i { position: relative; align-self: stretch; height: 2px; margin: 0 8px; background: var(--line); }
+  .flow-edge i::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .flow-edge i::after { content: ""; position: absolute; right: -8px; top: -4px; border: 5px solid transparent; border-left: 8px solid var(--line); border-right: 0; }
+  .st-pending .flow-edge i, .st-2 .flow-last i { background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); animation: flow-move .8s linear infinite; }
+  .st-2 .flow-last i { animation-iteration-count: 4; }
+  .st-fail .flow-last i { background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px); }
+  .flow-cut { display: none; }
+  .st-fail .flow-last .flow-cut { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 20px; height: 20px; margin: -10px 0 0 -10px; border: 1.5px solid var(--line); border-radius: 50%; background: var(--bg); color: var(--line); }
+  @keyframes flow-move { to { background-position: 12px 0; } }
+  @keyframes flow-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  @media (prefers-reduced-motion: reduce) { #res-flow * { animation: none !important; } }
+
   /* 상태 배지 */
-  .s2, .s3, .s4, .s5, .error, .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 600 11px/18px var(--mono); }
+  .s2, .s3, .s4, .s5, .error, .badge { display: inline-block; padding: 1px 8px; border-radius: 4px; font: 600 11px/18px var(--mono); }
   .s2 { background: var(--ok-bg); color: var(--ok); }
   .s3 { background: var(--warn-bg); color: var(--warn); }
   .s4, .s5, .error, .badge.fail { background: var(--err-bg); color: var(--danger); }
@@ -135,19 +215,19 @@
 
   /* 컬렉션 트리 */
   .tools { margin: 0 0 6px; }
-  .tools button { flex: 1; justify-content: center; height: 28px; background: none; border-color: transparent; color: var(--muted); }
-  .tools button:hover { color: var(--text); }
+  .tools button { flex: 1; justify-content: center; height: 28px; background: none; color: var(--muted); }
+  .tools button:hover { background: var(--hover); color: var(--text); }
   .tree, .tree ul { list-style: none; margin: 0; padding: 0; }
   .tree ul { padding-left: 12px; }
-  .node { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 6px; border-radius: 6px; cursor: pointer; color: var(--text); }
+  .node { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 6px; border-radius: 4px; cursor: pointer; color: var(--text); }
   .node:hover { background: var(--hover); }
   .node.selected { background: var(--selected); }
   .node .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .node .icon { color: var(--muted); }
   .node .actions { display: flex; gap: 2px; opacity: 0; }
   .node:hover .actions, .node.selected .actions { opacity: 1; }
-  .node .actions button { width: 24px; height: 24px; padding: 0; justify-content: center; border: 0; background: none; color: var(--muted); }
-  .node .actions button:hover { background: var(--selected); color: var(--text); }
+  .node .actions button { width: 22px; height: 22px; padding: 0; justify-content: center; background: none; color: var(--muted); }
+  .node .actions button:hover { background: var(--button-hover); color: var(--text); }
   .empty { margin: 2px 0 8px 26px; padding: 8px 4px; color: var(--muted); font-size: 12px; }
   .empty strong { display: block; color: var(--text); font-weight: 600; font-size: 12px; }
   .empty p { margin: 2px 0 8px; }
@@ -156,26 +236,26 @@
 
   /* 히스토리 */
   #history { list-style: none; margin: 0; padding: 0; }
-  #history li { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  #history li { padding: 6px 8px; border-radius: 4px; cursor: pointer; }
   #history li:hover { background: var(--hover); }
   .h-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .h-line .url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); }
-  .h-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 11px; }
+  .h-meta { white-space: nowrap; display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 11px; }
   .h-meta .badge, .h-meta .s2, .h-meta .s3, .h-meta .s4, .h-meta .s5 { padding: 0 6px; font-size: 10px; line-height: 16px; }
 
   /* 메뉴·다이얼로그·토스트 */
-  #menu { position: fixed; z-index: 10; min-width: 180px; padding: 4px; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
-  #menu button { width: 100%; height: 30px; padding: 0 8px; border: 0; background: none; justify-content: flex-start; font-weight: 400; }
+  #menu { position: fixed; z-index: 10; min-width: 180px; padding: 4px; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); }
+  #menu button { width: 100%; height: 30px; padding: 0 8px; background: none; justify-content: flex-start; font-weight: 400; }
   #menu button:hover { background: var(--hover); }
   #menu button.danger { color: var(--danger); }
   #menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
-  dialog { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); min-width: 480px; padding: 0; }
+  dialog { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); min-width: 480px; padding: 0; }
   dialog form { padding: 20px; }
   dialog::backdrop { background: var(--backdrop); }
   dialog h3 { margin: -20px -20px 16px; padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 600; }
   dialog label { display: block; margin-bottom: 12px; color: var(--muted); }
   dialog label input:not([type=checkbox]), dialog label select { display: block; width: 100%; margin-top: 4px; color: var(--text); }
-  #toast { position: fixed; right: 20px; bottom: 20px; max-width: 420px; padding: 10px 14px; background: var(--text); color: var(--bg); border-radius: 8px; box-shadow: var(--shadow); }
+  #toast { position: fixed; right: 20px; bottom: 20px; max-width: 420px; padding: 10px 14px; background: var(--text); color: var(--bg); border-radius: 6px; box-shadow: var(--shadow); }
   #toast.error { background: var(--danger); color: #ffffff; }
   [hidden] { display: none !important; }
 </style>
@@ -192,11 +272,11 @@
 </header>
 
 <div id="app">
+  <div class="tabs" id="side-tabs">
+    <button type="button" class="active" data-tab="side-collections"><i data-icon="library"></i>컬렉션</button>
+    <button type="button" data-tab="side-history"><i data-icon="history"></i>히스토리</button>
+  </div>
   <aside>
-    <div class="tabs" id="side-tabs">
-      <button type="button" class="active" data-tab="side-collections"><i data-icon="library"></i>컬렉션</button>
-      <button type="button" data-tab="side-history"><i data-icon="history"></i>히스토리</button>
-    </div>
     <div id="side-collections" class="pane">
       <div class="row tools">
         <button type="button" id="new-request"><i data-icon="file-plus"></i>새 요청</button>
@@ -211,8 +291,10 @@
   <main>
     <section id="request">
       <div class="urlbar">
-        <select id="method"></select>
-        <input id="url" placeholder="https://example.com/api 또는 {{baseUrl}}/path" spellcheck="false">
+        <div class="url-field">
+          <select id="method"></select>
+          <input id="url" placeholder="https://example.com/api 또는 {{baseUrl}}/path" spellcheck="false">
+        </div>
         <button type="button" id="send" class="primary"><i data-icon="send"></i>보내기</button>
         <button type="button" id="save"><i data-icon="save"></i>저장</button>
       </div>
@@ -257,7 +339,7 @@
         <button type="button" data-tab="res-headers-pane">Headers</button>
       </div>
       <div id="res-body-pane" class="pane"><pre id="res-body"></pre></div>
-      <div id="res-headers-pane" class="pane" hidden><table id="res-headers"></table></div>
+      <div id="res-headers-pane" class="pane" hidden><table id="res-headers"></table><div id="res-flow"></div></div>
     </section>
   </main>
 </div>
@@ -338,6 +420,10 @@ const ICONS = {
   pencil: ['M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'],
   copy: ['r:8,8,14,14,2', 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'],
   trash: ['M3 6h18', 'M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6', 'M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2'],
+  monitor: ['r:2,3,20,14,2', 'M8 21h8', 'M12 17v4'],
+  server: ['r:2,2,20,8,2', 'r:2,14,20,8,2', 'M6 6h.01', 'M6 18h.01'],
+  globe: ['c:12,12,10', 'M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20', 'M2 12h20'],
+  x: ['M18 6 6 18', 'm6 6 12 12'],
 };
 
 function icon(name, size = 16) {
@@ -520,7 +606,7 @@ const onParamsChange = () => { $('#url').value = composeUrl(); };
 function renderEditor() {
   // 가져온 요청의 PURGE 같은 메서드도 빈칸 대신 그대로 보이도록 목록에 덧붙인다.
   if (![...$('#method').options].some((o) => o.value === current.method)) $('#method').append(el('option', { value: current.method, textContent: current.method }));
-  $('#method').value = current.method;
+  $('#method').value = current.method; $('#method').dataset.method = current.method;
   $('#url').value = composeUrl();
   renderKv($('#params'), current.params, onParamsChange);
   renderKv($('#headers'), current.headers, () => {});
@@ -563,6 +649,7 @@ function resetResponse() {
   $('#res-meta').textContent = '';
   $('#res-body').textContent = '';
   $('#res-headers').replaceChildren();
+  $('#res-flow').replaceChildren();
 }
 
 function activeVariables() {
@@ -586,6 +673,7 @@ async function sendCurrent() {
   $('#res-meta').textContent = '보내는 중…';
   $('#res-body').textContent = '';
   $('#res-headers').replaceChildren();
+  renderFlow(null); // null 이면 '보내는 중' 상태로 그린다
   let result;
   try {
     result = await api('POST', '/api/send', { ...current, variables: activeVariables(), settings: data.settings });
@@ -644,6 +732,7 @@ function showResponse(result) {
     meta.replaceChildren(el('span', { className: 'error', textContent: code ? `${code} · ${message}` : message }));
     $('#res-body').textContent = hint || '';
     $('#res-headers').replaceChildren();
+    renderFlow(result);
     return;
   }
   meta.replaceChildren(
@@ -653,6 +742,46 @@ function showResponse(result) {
   );
   $('#res-body').replaceChildren(renderBody(result.body));
   $('#res-headers').replaceChildren(...result.headers.map(([k, v]) => el('tr', {}, el('td', { textContent: k }), el('td', { textContent: v }))));
+  renderFlow(result);
+}
+
+// 요청이 지나간 경로(이 앱 → 로컬 프록시 → 대상 서버)를 노드와 선으로 그린다.
+// result 가 null 이면 보내는 중(st-pending), 응답을 받으면 상태 코드 첫 자리(st-2 ~ st-5), 연결에 실패하면 st-fail 이다.
+// 성공하면 대상 노드에 변수 치환이 끝난 호스트와 실제 접속한 IP:포트를 적는다.
+function renderFlow(result) {
+  const node = (iconName, title, ...lines) => el('div', { className: 'flow-node' },
+    el('span', { className: 'flow-icon' }, icon(iconName, 18)),
+    el('div', { className: 'flow-text' }, el('strong', { textContent: title }), ...lines.map((t) => el('span', { textContent: t }))));
+  const edge = (above, below) => el('div', { className: 'flow-edge' },
+    el('span', { className: 'chip', textContent: above, title: above }),
+    el('i', {}, el('b', { className: 'flow-cut' }, icon('x', 12))),
+    el('span', { className: 'chip', textContent: below, title: below }));
+
+  let state = 'st-pending';
+  let target = node('globe', '대상 서버', current.url || 'URL 없음');
+  let last = edge(current.method, '보내는 중…');
+  if (result?.ok) {
+    const url = new URL(result.url);
+    state = `st-${String(result.status)[0]}`;
+    target = node('globe', url.host, result.remote, url.protocol === 'https:' ? 'HTTPS' : 'HTTP');
+    last = edge(`${current.method} ${decode(url.pathname + url.search)}`, `${result.status} ${result.statusText} · ${result.timeMs} ms`);
+  } else if (result) {
+    const { code, message } = result.error;
+    state = 'st-fail';
+    last = edge(current.method, code || message);
+  }
+  target.classList.add('flow-target');
+  last.classList.add('flow-last');
+
+  const flow = $('#res-flow');
+  flow.className = state;
+  flow.replaceChildren(
+    node('monitor', 'Vibe Dev Tools', '이 창'),
+    edge('POST /api/send', ''),
+    node('server', '로컬 프록시', location.host, 'Node.js'),
+    last,
+    target,
+  );
 }
 
 function findNode(nodes, id) {
@@ -890,7 +1019,7 @@ function bindEvents() {
   setupTabs($('#res-tabs'));
   document.addEventListener('click', () => { $('#menu').hidden = true; });
 
-  $('#method').onchange = (e) => { current.method = e.target.value; };
+  $('#method').onchange = (e) => { current.method = e.target.value; e.target.dataset.method = e.target.value; };
   $('#url').oninput = (e) => {
     parseUrlInput(e.target.value);
     renderKv($('#params'), current.params, onParamsChange);

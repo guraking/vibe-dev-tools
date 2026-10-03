@@ -159,6 +159,7 @@ async function sendRequest(spec) {
     let response = null;
     const req = lib.request(url, { method, headers, rejectUnauthorized: !settings.insecure }, (res) => {
       response = res;
+      const remote = `${res.socket.remoteAddress}:${res.socket.remotePort}`; // 실제로 접속한 IP:포트
       const chunks = [];
       let size = 0;
       let kept = 0;
@@ -185,6 +186,8 @@ async function sendRequest(spec) {
           headers: pairs,
           body: decoded.text,
           truncated: decoded.truncated,
+          url: url.href, // 변수 치환이 끝난 최종 URL
+          remote,
         });
       });
     });

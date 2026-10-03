@@ -159,6 +159,12 @@ test('sendRequest: 타임아웃이 지나면 TIMEOUT 으로 실패한다', async
   await assert.rejects(sendRequest({ url: `${echo.base}/slow`, settings: { timeoutMs: 200 } }), { code: 'TIMEOUT' });
 });
 
+test('sendRequest: 변수 치환이 끝난 최종 URL 과 실제 접속한 IP:포트를 돌려준다', async () => {
+  const r = await sendRequest({ url: '{{base}}/get', params: [{ key: 'q', value: '1' }], variables: { base: echo.base } });
+  assert.equal(r.url, `${echo.base}/get?q=1`);
+  assert.equal(r.remote, `127.0.0.1:${new URL(echo.base).port}`);
+});
+
 test('sendRequest: 10MB 넘는 응답은 앞 10MB 만 돌려준다', async () => {
   const r = await sendRequest({ url: `${echo.base}/big` });
   assert.equal(r.truncated, true);
