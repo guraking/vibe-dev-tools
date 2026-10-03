@@ -9,19 +9,25 @@
   :root {
     --page: #efeee9; --panel: #fbfaf6; --field: #ffffff; --ink: #111111; --rule: #d9d7cf; --muted: #77756e;
     --grid: rgba(17, 17, 17, .05); --backdrop: rgba(239, 238, 233, .75); --on-accent: #ffffff;
+    --line: var(--ink); --primary-bg: var(--ink); --primary-fg: var(--panel);
+    --selection-bg: var(--ink); --selection-fg: var(--panel); --radius: 0;
     --accent: #e5482d; --code: #2f54eb;
     --mono: "JetBrains Mono", "D2Coding", "Cascadia Mono", Consolas, monospace;
     --sans: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-    --shadow: 3px 3px 0 var(--ink);
+    --shadow: 3px 3px 0 var(--ink); --shadow-pressed: 1px 1px 0 var(--ink); --shadow-dialog: 6px 6px 0 var(--ink);
     font: 13px/1.5 var(--sans);
     color: var(--ink);
   }
-  /* 다크 테마. 선·글자·하드 섀도가 모두 --ink 를 쓰므로 변수만 뒤집으면 같은 구성이 반전된다. */
-  :root[data-theme="ink"] {
+  /* IntelliJ New UI 다크. 테두리는 흐리게, 그림자와 모눈은 없이, 주요 버튼과 선택은 파랑으로 간다. */
+  :root[data-theme="idea"] {
     color-scheme: dark;
-    --page: #161615; --panel: #1e1e1c; --field: #252522; --ink: #ece9e0; --rule: #3a3935; --muted: #8f8c84;
-    --accent: #ff5a3c; --code: #7c9cff; --grid: rgba(236, 233, 224, .05); --backdrop: rgba(22, 22, 21, .75);
+    --page: #1e1f22; --panel: #2b2d30; --field: #1e1f22; --ink: #dfe1e5; --rule: #393b40; --muted: #868a91;
+    --accent: #3574f0; --code: #6aab73; --grid: transparent; --backdrop: rgba(0, 0, 0, .5); --on-accent: #ffffff;
+    --line: #43454a; --primary-bg: #3574f0; --primary-fg: #ffffff;
+    --selection-bg: #2e436e; --selection-fg: #dfe1e5; --radius: 4px; --shadow: none;
+    --shadow-pressed: none; --shadow-dialog: 0 8px 24px rgba(0, 0, 0, .45);
   }
+  :root[data-theme="idea"] button:active, :root[data-theme="idea"] label.button:active { transform: none; }
   * { box-sizing: border-box; }
   body {
     margin: 0; height: 100vh; display: flex; flex-direction: column;
@@ -37,11 +43,11 @@
 
   #app { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px 1fr; gap: 16px; padding: 0 20px 20px; }
   main { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; }
-  .panel { background: var(--panel); border: 1px solid var(--ink); display: flex; flex-direction: column; min-height: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #request { flex: 0 1 auto; max-height: 52vh; }
   #response { flex: 1; }
   .panel-title {
-    display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 14px; border-bottom: 1px solid var(--ink);
+    display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line);
     font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase;
   }
   .spacer { flex: 1; }
@@ -50,17 +56,17 @@
   #request-pane { flex: 1; min-height: 0; }
   #response > .pane { flex: 1; min-height: 0; }
 
-  button, select, input, textarea, label.button { font: inherit; color: inherit; border-radius: 0; }
-  input, select, textarea { background: var(--field); border: 1px solid var(--ink); padding: 5px 8px; }
+  button, select, input, textarea, label.button { font: inherit; color: inherit; border-radius: var(--radius); }
+  input, select, textarea { background: var(--field); border: 1px solid var(--line); padding: 5px 8px; }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
   input[type=checkbox], input[type=radio] { accent-color: var(--ink); }
   button, label.button {
     font: 12px var(--mono); letter-spacing: .06em; padding: 5px 12px; cursor: pointer;
-    background: var(--panel); border: 1px solid var(--ink); box-shadow: var(--shadow);
+    background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
   }
-  button:active, label.button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  button:active, label.button:active { transform: translate(2px, 2px); box-shadow: var(--shadow-pressed); }
   button:disabled { opacity: .45; cursor: default; transform: none; }
-  button.primary { background: var(--ink); color: var(--panel); }
+  button.primary { background: var(--primary-bg); color: var(--primary-fg); border-color: var(--primary-bg); }
 
   .tabs { display: flex; align-items: stretch; gap: 0; }
   .panel-title.tabs { gap: 10px; align-items: center; }
@@ -84,7 +90,7 @@
   table.kv td:first-child { width: 26px; text-align: center; }
   table.kv input:not([type=checkbox]), table.kv select { width: 100%; border-color: var(--rule); font-family: var(--mono); font-size: 12px; }
   table.kv button { box-shadow: none; border-color: transparent; background: none; padding: 2px 8px; }
-  table.kv button:hover { border-color: var(--ink); }
+  table.kv button:hover { border-color: var(--line); }
   textarea { width: 100%; min-height: 160px; font: 12px/1.6 var(--mono); resize: vertical; }
   #auth-bearer, #auth-basic { margin-top: 10px; display: flex; gap: 8px; }
   #auth-bearer input { flex: 1; font-family: var(--mono); }
@@ -92,11 +98,11 @@
 
   .method, .tag {
     display: inline-block; font: 600 10px/16px var(--mono); letter-spacing: .04em; padding: 0 5px;
-    border: 1px solid var(--ink); background: var(--field); margin-right: 8px; vertical-align: 1px;
+    border: 1px solid var(--line); background: var(--field); margin-right: 8px; vertical-align: 1px;
     min-width: 40px; text-align: center;
   }
   #res-meta { font: 12px var(--mono); letter-spacing: .04em; text-transform: none; color: var(--muted); }
-  #res-meta .s2, #res-meta .s3, #res-meta .s4, #res-meta .s5 { display: inline-block; padding: 1px 8px; border: 1px solid var(--ink); color: var(--panel); background: var(--ink); }
+  #res-meta .s2, #res-meta .s3, #res-meta .s4, #res-meta .s5 { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); color: var(--primary-fg); background: var(--primary-bg); }
   #res-meta .s3 { background: var(--field); color: var(--ink); }
   #res-meta .s4, #res-meta .s5, #res-meta .error { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   #res-meta .error { display: inline-block; padding: 1px 8px; }
@@ -112,8 +118,8 @@
   .tree, .tree ul { list-style: none; margin: 0; padding-left: 14px; }
   .tree { padding-left: 0; }
   .tree span.node { display: block; padding: 4px 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; }
-  .tree span.node:hover { border-color: var(--ink); }
-  .tree span.node.selected { background: var(--ink); color: var(--panel); }
+  .tree span.node:hover { border-color: var(--line); }
+  .tree span.node.selected { background: var(--selection-bg); color: var(--selection-fg); }
   .tree span.node.selected .method { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   #side-collections .row button { flex: 1; }
 
@@ -127,16 +133,16 @@
   .leader .stat.fail { color: var(--accent); }
   #history small { display: block; color: var(--muted); font: 10px var(--mono); margin-top: 2px; }
 
-  #menu { position: fixed; z-index: 10; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--ink); box-shadow: var(--shadow); }
+  #menu { position: fixed; z-index: 10; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
   #menu button { border: 0; box-shadow: none; text-align: left; }
-  #menu button:hover { background: var(--ink); color: var(--panel); }
-  dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--ink); border-radius: 0; box-shadow: 6px 6px 0 var(--ink); min-width: 480px; padding: 0; }
+  #menu button:hover { background: var(--selection-bg); color: var(--selection-fg); }
+  dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-dialog); min-width: 480px; padding: 0; }
   dialog form { padding: 16px; }
   dialog::backdrop { background: var(--backdrop); }
-  dialog h3 { margin: -16px -16px 16px; padding: 12px 16px; border-bottom: 1px solid var(--ink); font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  dialog h3 { margin: -16px -16px 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
   dialog label { display: block; margin-bottom: 10px; }
   dialog label input:not([type=checkbox]), dialog label select { display: block; width: 100%; margin-top: 4px; }
-  #toast { position: fixed; right: 20px; bottom: 20px; max-width: 420px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--ink); box-shadow: var(--shadow); font: 12px var(--mono); }
+  #toast { position: fixed; right: 20px; bottom: 20px; max-width: 420px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); font: 12px var(--mono); }
   #toast.error { border-left: 6px solid var(--accent); } #toast.warn { border-left: 6px solid var(--code); }
   [hidden] { display: none !important; }
 </style>
@@ -251,7 +257,7 @@
     <h3>설정</h3>
     <label><input type="checkbox" id="set-insecure"> SSL 인증서 검증 무시 (자체 서명 인증서를 쓰는 사내 서버용)</label>
     <label>타임아웃(초) <input type="number" id="set-timeout" min="1" max="600" required></label>
-    <label>테마 <select id="set-theme"><option value="paper">Paper</option><option value="ink">Ink (다크)</option></select></label>
+    <label>테마 <select id="set-theme"><option value="paper">Paper</option><option value="idea">IntelliJ (다크)</option></select></label>
     <div class="row end"><button type="button" onclick="this.closest('dialog').close('cancel')">취소</button><button value="ok" class="primary">저장</button></div>
   </form>
 </dialog>
@@ -774,7 +780,7 @@ function bindEvents() {
   $('#open-settings').onclick = () => {
     $('#set-insecure').checked = data.settings.insecure;
     $('#set-timeout').value = Math.round(data.settings.timeoutMs / 1000);
-    $('#set-theme').value = data.settings.theme || 'paper';
+    $('#set-theme').value = currentTheme();
     $('#settings-dialog').returnValue = '';
     $('#settings-dialog').showModal();
   };
@@ -805,7 +811,10 @@ function bindEvents() {
   };
 }
 
-const applyTheme = () => { document.documentElement.dataset.theme = data.settings.theme || 'paper'; };
+// 지운 테마(ink 등)가 저장돼 있으면 Paper 로 되돌린다.
+const THEMES = ['paper', 'idea'];
+const currentTheme = () => (THEMES.includes(data.settings.theme) ? data.settings.theme : 'paper');
+const applyTheme = () => { document.documentElement.dataset.theme = currentTheme(); };
 
 async function init() {
   $('#host').textContent = location.host;
