@@ -205,6 +205,7 @@ let data;                    // GET /api/data 의 data. 바꾼 뒤 save() 로 �
 let current = blankRequest(); // 편집 중인 요청
 let currentId = null;        // 컬렉션에서 연 요청 노드 id. 새 요청·히스토리에서 연 요청은 null
 const collapsed = new Set(); // 접힌 폴더 id. 화면 상태라 저장하지 않는다
+let savedSnapshot = JSON.stringify(current); // 마지막으로 열거나 저장한 요청. 다르면 저장하지 않은 변경이 있다
 
 async function api(method, url, body) {
   const res = await fetch(url, {
@@ -268,7 +269,7 @@ function kvRow(table, rows, row, onChange, withFiles) {
 
   const valueCell = el('td');
   function renderValue() {
-    if (row.type === 'file') {
+    if (withFiles && row.type === 'file') {
       const picker = el('input', { type: 'file' });
       picker.onchange = () => readFile(picker.files[0], row)
         .then(() => { renderValue(); edited(); })
@@ -339,6 +340,8 @@ function parseUrlInput(text) {
 const onParamsChange = () => { $('#url').value = composeUrl(); };
 
 function renderEditor() {
+  // 가져온 요청의 PURGE 같은 메서드도 빈칸 대신 그대로 보이도록 목록에 덧붙인다.
+  if (![...$('#method').options].some((o) => o.value === current.method)) $('#method').append(el('option', { value: current.method, textContent: current.method }));
   $('#method').value = current.method;
   $('#url').value = composeUrl();
   renderKv($('#params'), current.params, onParamsChange);
@@ -367,7 +370,9 @@ function showBody() {
 }
 
 function openRequest(request, id) {
+  if (JSON.stringify(current) !== savedSnapshot && !confirm('저장하지 않은 변경이 있습니다. 버릴까요?')) return;
   current = normalize(structuredClone(request));
+  savedSnapshot = JSON.stringify(current);
   currentId = id;
   renderEditor();
 }
@@ -377,7 +382,8 @@ function activeVariables() {
   return Object.fromEntries((env?.variables || []).filter((v) => v.enabled !== false && v.key).map((v) => [v.key, v.value]));
 }
 
-// 히스토리에는 첨부 파일 내용을 남기지 않는다. data.json 이 파일 크기만큼 불어나는 것을 막는다.
+// 히스토리·컬렉션에는 첨부 파일 내용을 남기지 않는다. data.json 이 파일 크기만큼 불어나 50MB 저장 한도를 넘는 것을 막는다.
+// 저장한 요청을 다시 열면 파일 이름만 남으므로 보내기 전에 파일을 다시 골라야 한다.
 function withoutFiles(request) {
   const copy = structuredClone(request);
   for (const field of copy.body.fields) delete field.fileBase64;
@@ -531,7 +537,8 @@ function folderOptions(nodes, prefix) {
 function saveCurrent() {
   const node = currentId && findNode(data.collections, currentId);
   if (node) {
-    node.request = structuredClone(current);
+    node.request = withoutFiles(current);
+    savedSnapshot = JSON.stringify(current);
     renderTree();
     save();
     toast('저장했습니다');
@@ -582,7 +589,7 @@ function bindEvents() {
     parseUrlInput(e.target.value);
     renderKv($('#params'), current.params, onParamsChange);
   };
-  $('#url').onkeydown = (e) => { if (e.key === 'Enter') sendCurrent(); };
+  $('#url').onkeydown = (e) => { if (e.key === 'Enter' && !$('#send').disabled) sendCurrent(); };
   $('#send').onclick = sendCurrent;
   $('#save').onclick = saveCurrent;
 
@@ -608,12 +615,14 @@ function bindEvents() {
     if ($('#save-dialog').returnValue !== 'ok') return;
     const name = $('#save-name').value.trim();
     if (!name) return toast('이름을 입력하세요', 'error');
-    const node = { id: newId(), name, type: 'request', request: structuredClone(current) };
+    const node = { id: newId(), name, type: 'request', request: withoutFiles(current) };
     const parent = findNode(data.collections, $('#save-folder').value);
     (parent ? parent.children : data.collections).push(node);
     currentId = node.id;
+    savedSnapshot = JSON.stringify(current);
     renderTree();
     save();
+    toast('저장했습니다');
   };
 
   $('#env').onchange = (e) => {
@@ -641,7 +650,10 @@ function bindEvents() {
     editingEnv = data.environments[0] || null;
     renderEnvDialog();
   };
-  $('#env-name').oninput = (e) => { editingEnv.name = e.target.value; };
+  $('#env-name').oninput = (e) => {
+    editingEnv.name = e.target.value;
+    $('#env-pick').selectedOptions[0].textContent = e.target.value;
+  };
   $('#env-dialog').onclose = () => {
     renderEnvSelect();
     save();
@@ -681,7 +693,6 @@ function bindEvents() {
 
 async function init() {
   $('#method').replaceChildren(...METHODS.map((m) => el('option', { value: m, textContent: m })));
-  bindEvents();
   try {
     const res = await api('GET', '/api/data');
     data = res.data;
@@ -690,6 +701,8 @@ async function init() {
     toast(`데이터를 불러오지 못했습니다: ${err.message}`, 'error');
     return;
   }
+  // 이벤트는 data 가 있어야 동작하므로 로드에 성공한 뒤에 연결한다.
+  bindEvents();
   renderEnvSelect();
   renderHistory();
   renderEditor();
