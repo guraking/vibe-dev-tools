@@ -153,6 +153,9 @@
   .res-head .title { font-weight: 600; color: var(--text); }
   #res-meta { font: 12px var(--mono); color: var(--muted); }
   #response > .pane { flex: 1; min-height: 0; }
+  #res-body-pane:focus { outline: none; }
+  .tabs #copy-body { width: 28px; height: 28px; padding: 0; justify-content: center; border: 0; border-radius: 4px; }
+  .tabs #copy-body:hover { background: var(--hover); }
   /* 응답 전: 가운데에 보내기 아이콘과 안내 문구 */
   #response.idle #res-body-pane { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   #response.idle #res-body-pane::before {
@@ -262,7 +265,7 @@
 </head>
 <body>
 <header id="topbar">
-  <span id="brand">Vibe Dev Tools</span>
+  <span id="brand">KingGura Tools</span>
   <span id="host"></span>
   <span class="spacer"></span>
   <label class="env" title="환경"><i data-icon="layers"></i><select id="env"></select></label>
@@ -284,7 +287,10 @@
       </div>
       <div id="tree"></div>
     </div>
-    <div id="side-history" class="pane" hidden><ul id="history"></ul></div>
+    <div id="side-history" class="pane" hidden>
+      <div class="row tools"><button type="button" id="clear-history"><i data-icon="trash"></i>히스토리 비우기</button></div>
+      <ul id="history"></ul>
+    </div>
   </aside>
   <div id="splitter" title="드래그해서 너비 조절"></div>
 
@@ -335,10 +341,11 @@
         <span class="title">응답</span>
         <span id="res-meta"></span>
         <span class="spacer"></span>
+        <button type="button" id="copy-body" title="응답 본문 복사"><i data-icon="copy"></i></button>
         <button type="button" class="active" data-tab="res-body-pane">Body</button>
         <button type="button" data-tab="res-headers-pane">Headers</button>
       </div>
-      <div id="res-body-pane" class="pane"><pre id="res-body"></pre></div>
+      <div id="res-body-pane" class="pane" tabindex="0"><pre id="res-body"></pre></div>
       <div id="res-headers-pane" class="pane" hidden><table id="res-headers"></table><div id="res-flow"></div></div>
     </section>
   </main>
@@ -468,7 +475,6 @@ let data;                    // GET /api/data 의 data. 바꾼 뒤 save() 로 �
 let current = blankRequest(); // 편집 중인 요청
 let currentId = null;        // 컬렉션에서 연 요청 노드 id. 새 요청·히스토리에서 연 요청은 null
 const collapsed = new Set(); // 접힌 폴더 id. 화면 상태라 저장하지 않는다
-let savedSnapshot = JSON.stringify(current); // 마지막으로 열거나 저장한 요청. 다르면 저장하지 않은 변경이 있다
 let openedCount = 0; // 요청을 열 때마다 1 증가. 응답을 기다리는 동안 다른 요청을 열었는지 판단한다
 
 async function api(method, url, body) {
@@ -634,9 +640,7 @@ function showBody() {
 }
 
 function openRequest(request, id) {
-  if (JSON.stringify(current) !== savedSnapshot && !confirm('저장하지 않은 변경이 있습니다. 버릴까요?')) return;
   current = normalize(structuredClone(request));
-  savedSnapshot = JSON.stringify(current);
   currentId = id;
   openedCount += 1;
   resetResponse();
@@ -945,7 +949,6 @@ function saveCurrent() {
   const node = currentId && findNode(data.collections, currentId);
   if (node) {
     node.request = withoutFiles(current);
-    savedSnapshot = JSON.stringify(current);
     renderTree();
     save();
     toast('저장했습니다');
@@ -1014,9 +1017,29 @@ function bindEvents() {
     save();
   };
 
+  // 지운 기록은 되돌릴 수 없으므로 건수를 보여주고 확인을 받는다.
+  $('#clear-history').onclick = () => {
+    if (!data.history.length || !confirm(`히스토리 ${data.history.length}건을 모두 지울까요?`)) return;
+    data.history = [];
+    renderHistory();
+    save();
+  };
   setupTabs($('#side-tabs'));
   setupTabs($('#req-tabs'));
   setupTabs($('#res-tabs'));
+  // 응답 본문을 클릭한 뒤 Ctrl+A 를 누르면 페이지 전체가 아니라 본문만 선택한다. 한글 입력 상태에서도 되도록 글자 대신 키 위치로 판단한다.
+  $('#res-body-pane').onkeydown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
+      e.preventDefault();
+      getSelection().selectAllChildren($('#res-body'));
+    }
+  };
+  // 화면에 보이는 그대로(JSON 이면 정렬된 상태로) 응답 본문을 복사한다.
+  $('#copy-body').onclick = () => {
+    const text = $('#res-body').textContent;
+    if (!text) return toast('복사할 응답이 없습니다');
+    navigator.clipboard.writeText(text).then(() => toast('복사했습니다'), (err) => toast(`복사 실패: ${err.message}`, 'error'));
+  };
   document.addEventListener('click', () => { $('#menu').hidden = true; });
 
   $('#method').onchange = (e) => { current.method = e.target.value; e.target.dataset.method = e.target.value; };
@@ -1055,7 +1078,6 @@ function bindEvents() {
     const parent = findNode(data.collections, $('#save-folder').value);
     (parent ? parent.children : data.collections).push(node);
     currentId = node.id;
-    savedSnapshot = JSON.stringify(current);
     renderTree();
     save();
     toast('저장했습니다');
