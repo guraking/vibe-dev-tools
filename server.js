@@ -402,6 +402,18 @@ function sendJson(res, status, value) {
   res.end(JSON.stringify(value));
 }
 
+function sendFont(res, file) {
+  let data;
+  try {
+    data = fs.readFileSync(file);
+  } catch (err) {
+    if (err.code === 'ENOENT') return sendJson(res, 404, failure('NOT_FOUND', '없는 폰트입니다'));
+    throw err;
+  }
+  res.writeHead(200, { 'Content-Type': 'font/woff2', 'Cache-Control': 'max-age=86400' });
+  res.end(data);
+}
+
 const failure = (code, message) => ({ ok: false, error: { code, message, hint: '' } });
 
 function safeEqual(given, expected) {
@@ -412,7 +424,7 @@ function safeEqual(given, expected) {
 
 // /api/send 는 아무 주소로나 요청을 보내는 프록시이므로, 이 PC 의 다른 웹페이지가 쓰지 못하게
 // Host 검사(DNS 리바인딩 방지)와 페이지에만 심은 토큰 검사를 모두 통과해야 한다.
-function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index.html') }) {
+function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index.html'), fontDir = path.join(__dirname, 'fonts') }) {
   const server = http.createServer(async (req, res) => {
     try {
       if (req.headers.host !== `127.0.0.1:${req.socket.localPort}`) return sendJson(res, 403, failure('FORBIDDEN', '허용되지 않은 Host 입니다'));
@@ -421,6 +433,9 @@ function createServer({ dataFile, token, indexFile = path.join(__dirname, 'index
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(html);
       }
+      // 폰트는 CSS 가 토큰 헤더 없이 불러오므로 토큰 검사 전에 둔다. 영문·숫자·하이픈 이름의 .woff2 만 허용해 다른 파일은 읽을 수 없다.
+      const font = /^\/fonts\/([A-Za-z0-9-]+\.woff2)$/.exec(req.url);
+      if (req.method === 'GET' && font) return sendFont(res, path.join(fontDir, font[1]));
       if (!safeEqual(req.headers['x-token'], token)) return sendJson(res, 403, failure('FORBIDDEN', '토큰이 올바르지 않습니다'));
 
       if (req.method === 'POST' && req.url === '/api/send') {

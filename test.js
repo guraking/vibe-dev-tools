@@ -465,3 +465,15 @@ test('server: /api/ping 은 마지막 신호 시각을 갱신한다', async (t) 
   assert.ok(server.lastPing > before);
   assert.equal((await fetch(`${base}/api/ping`, { method: 'POST' })).status, 403);
 });
+
+test('server: 폰트는 토큰 없이 받을 수 있고, 다른 파일과 없는 폰트는 거부한다', async (t) => {
+  const { base } = await startApp(t);
+  const ok = await fetch(`${base}/fonts/JetBrainsMono-Regular.woff2`);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('content-type'), 'font/woff2');
+  assert.equal(Buffer.from(await ok.arrayBuffer()).subarray(0, 4).toString(), 'wOF2');
+  assert.equal((await fetch(`${base}/fonts/Nope.woff2`)).status, 404);
+  assert.equal((await fetch(`${base}/fonts/..%2Fserver.js`)).status, 403);
+  assert.equal((await fetch(`${base}/fonts/server.js`)).status, 403);
+  assert.equal(await requestWithHost(`${base}/fonts/JetBrainsMono-Regular.woff2`, 'evil.example'), 403);
+});
