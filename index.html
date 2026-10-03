@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API 클라이언트</title>
+<style>
+  :root {
+    --bg: #1e1f22; --panel: #2b2d31; --line: #3a3c42; --text: #e6e6e6; --muted: #9a9ca3;
+    --accent: #e8743b; --ok: #3fb950; --warn: #d29922; --err: #f85149;
+    font: 13px/1.4 "Segoe UI", "Malgun Gothic", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); }
+  #app { display: grid; grid-template-columns: 260px 1fr; height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  button, select, input, textarea, label.button {
+    font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px;
+  }
+  button, label.button { cursor: pointer; background: var(--panel); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tabs { display: flex; gap: 2px; align-items: center; border-bottom: 1px solid var(--line); padding: 0 8px; }
+  .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 10px; color: var(--muted); }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  header, .urlbar { display: flex; gap: 6px; align-items: center; padding: 8px; border-bottom: 1px solid var(--line); }
+  .spacer { flex: 1; }
+  .urlbar input { flex: 1; font-family: Consolas, monospace; }
+  .pane { padding: 8px; overflow: auto; }
+  aside .pane { flex: 1; }
+  #request-pane { max-height: 40vh; }
+  .row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .row.end { justify-content: flex-end; margin: 12px 0 0; }
+  table.kv { width: 100%; border-collapse: collapse; }
+  table.kv td { padding: 2px; vertical-align: middle; }
+  table.kv td:first-child { width: 24px; }
+  table.kv input:not([type=checkbox]) { width: 100%; }
+  #res-headers td { font-family: Consolas, monospace; padding: 2px 8px; }
+  textarea { width: 100%; min-height: 160px; font-family: Consolas, monospace; resize: vertical; }
+  #auth-bearer, #auth-basic { margin-top: 8px; display: flex; gap: 6px; }
+  #auth-bearer input { flex: 1; }
+  #response { flex: 1; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--line); }
+  #response > .pane { flex: 1; min-height: 0; }
+  #res-meta { color: var(--muted); padding: 8px 0; }
+  .s2 { color: var(--ok); } .s3 { color: var(--warn); } .s4, .s5, .error { color: var(--err); }
+  pre { margin: 0; font-family: Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+  .tree, .tree ul { list-style: none; margin: 0; padding-left: 10px; }
+  .tree { padding-left: 0; }
+  .tree span.node { display: block; padding: 3px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tree span.node:hover, #history li:hover { background: var(--line); }
+  .tree span.node.selected { background: var(--accent); color: #fff; }
+  .method { font-size: 11px; font-weight: 600; color: var(--muted); margin-right: 6px; }
+  #history { list-style: none; margin: 0; padding: 0; }
+  #history li { padding: 4px 6px; border-radius: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #history small { display: block; color: var(--muted); }
+  #menu { position: fixed; z-index: 10; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+  #menu button { border: 0; border-radius: 0; text-align: left; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; min-width: 460px; }
+  dialog::backdrop { background: #0008; }
+  dialog h3 { margin-top: 0; }
+  dialog label { display: block; margin-bottom: 8px; }
+  #toast { position: fixed; right: 16px; bottom: 16px; max-width: 420px; padding: 10px 14px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); }
+  #toast.error { border-color: var(--err); } #toast.warn { border-color: var(--warn); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <div class="tabs" id="side-tabs">
+      <button type="button" class="active" data-tab="side-collections">컬렉션</button>
+      <button type="button" data-tab="side-history">히스토리</button>
+    </div>
+    <div id="side-collections" class="pane">
+      <div class="row"><button type="button" id="new-request">+ 새 요청</button><button type="button" id="new-folder">+ 새 폴더</button></div>
+      <div id="tree"></div>
+    </div>
+    <div id="side-history" class="pane" hidden><ul id="history"></ul></div>
+  </aside>
+
+  <main>
+    <header>
+      <label>환경 <select id="env"></select></label>
+      <button type="button" id="edit-env">환경 편집</button>
+      <button type="button" id="open-settings" title="설정">⚙</button>
+      <span class="spacer"></span>
+      <label class="button">Postman 가져오기<input type="file" id="import" accept=".json,application/json" hidden></label>
+    </header>
+
+    <div class="urlbar">
+      <select id="method"></select>
+      <input id="url" placeholder="https://example.com/api 또는 {{baseUrl}}/path" spellcheck="false">
+      <button type="button" id="send" class="primary">보내기</button>
+      <button type="button" id="save">저장</button>
+    </div>
+
+    <div class="tabs" id="req-tabs">
+      <button type="button" class="active" data-tab="tab-params">Params</button>
+      <button type="button" data-tab="tab-headers">Headers</button>
+      <button type="button" data-tab="tab-auth">Auth</button>
+      <button type="button" data-tab="tab-body">Body</button>
+    </div>
+    <div id="request-pane" class="pane">
+      <div id="tab-params"><table class="kv" id="params"></table></div>
+      <div id="tab-headers" hidden><table class="kv" id="headers"></table></div>
+      <div id="tab-auth" hidden>
+        <select id="auth-type">
+          <option value="none">없음</option>
+          <option value="bearer">Bearer Token</option>
+          <option value="basic">Basic Auth</option>
+        </select>
+        <div id="auth-bearer"><input id="auth-token" placeholder="토큰 ({{token}} 사용 가능)" spellcheck="false"></div>
+        <div id="auth-basic"><input id="auth-user" placeholder="사용자"><input id="auth-pass" type="password" placeholder="비밀번호"></div>
+      </div>
+      <div id="tab-body" hidden>
+        <div class="row">
+          <label><input type="radio" name="body-type" value="none"> none</label>
+          <label><input type="radio" name="body-type" value="json"> JSON</label>
+          <label><input type="radio" name="body-type" value="form"> form-data</label>
+          <label><input type="radio" name="body-type" value="urlencoded"> x-www-form-urlencoded</label>
+          <label><input type="radio" name="body-type" value="raw"> raw</label>
+        </div>
+        <textarea id="body-raw" spellcheck="false"></textarea>
+        <table class="kv" id="body-fields"></table>
+      </div>
+    </div>
+
+    <section id="response">
+      <div class="tabs" id="res-tabs">
+        <span id="res-meta">응답이 여기에 표시됩니다</span>
+        <span class="spacer"></span>
+        <button type="button" class="active" data-tab="res-body-pane">Body</button>
+        <button type="button" data-tab="res-headers-pane">Headers</button>
+      </div>
+      <div id="res-body-pane" class="pane"><pre id="res-body"></pre></div>
+      <div id="res-headers-pane" class="pane" hidden><table id="res-headers"></table></div>
+    </section>
+  </main>
+</div>
+
+<div id="menu" hidden></div>
+<div id="toast" hidden></div>
+
+<dialog id="save-dialog">
+  <form method="dialog">
+    <h3>요청 저장</h3>
+    <label>이름 <input id="save-name" required></label>
+    <label>폴더 <select id="save-folder"></select></label>
+    <div class="row end"><button value="cancel" formnovalidate>취소</button><button value="ok" class="primary">저장</button></div>
+  </form>
+</dialog>
+
+<dialog id="env-dialog">
+  <form method="dialog">
+    <h3>환경 편집</h3>
+    <div class="row">
+      <select id="env-pick"></select>
+      <button type="button" id="env-add">추가</button>
+      <button type="button" id="env-del">삭제</button>
+    </div>
+    <label>이름 <input id="env-name"></label>
+    <table class="kv" id="env-vars"></table>
+    <div class="row end"><button value="ok" class="primary">닫기</button></div>
+  </form>
+</dialog>
+
+<dialog id="settings-dialog">
+  <form method="dialog">
+    <h3>설정</h3>
+    <label><input type="checkbox" id="set-insecure"> SSL 인증서 검증 무시 (자체 서명 인증서를 쓰는 사내 서버용)</label>
+    <label>타임아웃(초) <input type="number" id="set-timeout" min="1" max="600" required></label>
+    <div class="row end"><button value="cancel" formnovalidate>취소</button><button value="ok" class="primary">저장</button></div>
+  </form>
+</dialog>
+
+<script>
+'use strict';
+const TOKEN = '__TOKEN__';
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+const HISTORY_LIMIT = 100;     // 스펙: 히스토리는 최근 100건만 유지
+const MAX_TIMEOUT_SECONDS = 600;
+
+const $ = (selector) => document.querySelector(selector);
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  node.append(...children);
+  return node;
+}
+const newId = () => crypto.randomUUID();
+const blankRow = () => ({ key: '', value: '', enabled: true });
+const blankRequest = () => ({
+  method: 'GET', url: '', params: [], headers: [],
+  auth: { type: 'none', token: '', username: '', password: '' },
+  body: { type: 'none', raw: '', fields: [] },
+});
+// 오래된 저장본이나 가져온 요청에 빠진 필드를 기본값으로 채운다.
+function normalize(request) {
+  const blank = blankRequest();
+  return { ...blank, ...request, auth: { ...blank.auth, ...request.auth }, body: { ...blank.body, ...request.body } };
+}
+
+let data;                    // GET /api/data 의 data. 바꾼 뒤 save() 로 저장한다
+let current = blankRequest(); // 편집 중인 요청
+let currentId = null;        // 컬렉션에서 연 요청 노드 id. 새 요청·히스토리에서 연 요청은 null
+const collapsed = new Set(); // 접힌 폴더 id. 화면 상태라 저장하지 않는다
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: { 'X-Token': TOKEN, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error?.message || `HTTP ${res.status}`);
+  return json;
+}
+
+function save() {
+  api('PUT', '/api/data', data).catch((err) => toast(`저장 실패: ${err.message}`, 'error'));
+}
+
+let toastTimer;
+function toast(message, kind = 'info') {
+  const box = $('#toast');
+  box.textContent = message;
+  box.className = kind;
+  box.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { box.hidden = true; }, 5000);
+}
+
+// 탭 바의 data-tab 버튼과 같은 id 의 패널만 보이게 한다.
+function setupTabs(bar) {
+  bar.addEventListener('click', (event) => {
+    const clicked = event.target.closest('button[data-tab]');
+    if (!clicked) return;
+    for (const button of bar.querySelectorAll('button[data-tab]')) {
+      button.classList.toggle('active', button === clicked);
+      $(`#${button.dataset.tab}`).hidden = button !== clicked;
+    }
+  });
+}
+
+// key/value 표. rows 배열을 직접 고치며, 마지막 줄은 항상 입력용 빈 줄이다.
+function renderKv(table, rows, onChange, withFiles = false) {
+  const last = rows.at(-1);
+  if (!last || last.key || last.value || last.fileName) rows.push(blankRow());
+  table.replaceChildren(...rows.map((row) => kvRow(table, rows, row, onChange, withFiles)));
+}
+
+function kvRow(table, rows, row, onChange, withFiles) {
+  // 빈 줄에 입력이 생기면 그 아래에 새 빈 줄을 붙인다. 표 전체를 다시 그리지 않아 입력 포커스가 유지된다.
+  function edited() {
+    if (row === rows.at(-1)) {
+      const next = blankRow();
+      rows.push(next);
+      table.append(kvRow(table, rows, next, onChange, withFiles));
+    }
+    onChange();
+  }
+
+  const check = el('input', { type: 'checkbox', checked: row.enabled !== false });
+  check.onchange = () => { row.enabled = check.checked; onChange(); };
+  const key = el('input', { value: row.key, placeholder: 'key', spellcheck: false });
+  key.oninput = () => { row.key = key.value; edited(); };
+
+  const valueCell = el('td');
+  function renderValue() {
+    if (row.type === 'file') {
+      const picker = el('input', { type: 'file' });
+      picker.onchange = () => readFile(picker.files[0], row)
+        .then(() => { renderValue(); edited(); })
+        .catch((err) => toast(err.message, 'error'));
+      valueCell.replaceChildren(picker, el('span', { textContent: row.fileName ? ` ${row.fileName}` : '' }));
+    } else {
+      const value = el('input', { value: row.value, placeholder: 'value', spellcheck: false });
+      value.oninput = () => { row.value = value.value; edited(); };
+      valueCell.replaceChildren(value);
+    }
+  }
+  renderValue();
+
+  const remove = el('button', { type: 'button', textContent: '×', title: '삭제' });
+  remove.onclick = () => {
+    rows.splice(rows.indexOf(row), 1);
+    renderKv(table, rows, onChange, withFiles);
+    onChange();
+  };
+
+  const cells = [el('td', {}, check), el('td', {}, key)];
+  if (withFiles) {
+    const type = el('select', {}, el('option', { value: 'text', textContent: 'Text' }), el('option', { value: 'file', textContent: 'File' }));
+    type.value = row.type || 'text';
+    type.onchange = () => { row.type = type.value; renderValue(); edited(); };
+    cells.push(el('td', {}, type));
+  }
+  cells.push(valueCell, el('td', {}, remove));
+  return el('tr', {}, ...cells);
+}
+
+function readFile(file, row) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve();
+    const reader = new FileReader();
+    reader.onload = () => {
+      row.fileName = file.name;
+      row.fileBase64 = reader.result.split(',')[1] || '';
+      resolve();
+    };
+    reader.onerror = () => reject(new Error(`파일을 읽을 수 없습니다: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
+// URL 입력칸 = url + '?' + 활성 params. 서버에는 url 과 params 를 따로 보내고, 인코딩은 서버가 한다.
+function composeUrl() {
+  const query = current.params.filter((p) => p.enabled !== false && p.key).map((p) => `${p.key}=${p.value}`).join('&');
+  return query ? `${current.url}?${query}` : current.url;
+}
+
+const decode = (text) => { try { return decodeURIComponent(text); } catch { return text; } };
+
+// URL 입력칸을 고치면 쿼리 부분으로 활성 params 를 다시 만든다. 비활성 params 는 남겨 둔다.
+function parseUrlInput(text) {
+  const q = text.indexOf('?');
+  current.url = q < 0 ? text : text.slice(0, q);
+  const parsed = (q < 0 ? '' : text.slice(q + 1)).split('&').filter(Boolean).map((pair) => {
+    const i = pair.indexOf('=');
+    return { key: decode(i < 0 ? pair : pair.slice(0, i)), value: i < 0 ? '' : decode(pair.slice(i + 1)), enabled: true };
+  });
+  current.params = [...parsed, ...current.params.filter((p) => p.enabled === false)];
+}
+
+const onParamsChange = () => { $('#url').value = composeUrl(); };
+
+function renderEditor() {
+  $('#method').value = current.method;
+  $('#url').value = composeUrl();
+  renderKv($('#params'), current.params, onParamsChange);
+  renderKv($('#headers'), current.headers, () => {});
+  $('#auth-type').value = current.auth.type;
+  $('#auth-token').value = current.auth.token;
+  $('#auth-user').value = current.auth.username;
+  $('#auth-pass').value = current.auth.password;
+  showAuth();
+  for (const radio of document.querySelectorAll('input[name=body-type]')) radio.checked = radio.value === current.body.type;
+  $('#body-raw').value = current.body.raw;
+  showBody();
+  renderTree();
+}
+
+function showAuth() {
+  $('#auth-bearer').hidden = current.auth.type !== 'bearer';
+  $('#auth-basic').hidden = current.auth.type !== 'basic';
+}
+
+function showBody() {
+  const type = current.body.type;
+  $('#body-raw').hidden = type !== 'json' && type !== 'raw';
+  $('#body-fields').hidden = type !== 'form' && type !== 'urlencoded';
+  if (!$('#body-fields').hidden) renderKv($('#body-fields'), current.body.fields, () => {}, type === 'form');
+}
+
+function openRequest(request, id) {
+  current = normalize(structuredClone(request));
+  currentId = id;
+  renderEditor();
+}
+
+function activeVariables() {
+  const env = data.environments.find((e) => e.id === data.activeEnvironmentId);
+  return Object.fromEntries((env?.variables || []).filter((v) => v.enabled !== false && v.key).map((v) => [v.key, v.value]));
+}
+
+// 히스토리에는 첨부 파일 내용을 남기지 않는다. data.json 이 파일 크기만큼 불어나는 것을 막는다.
+function withoutFiles(request) {
+  const copy = structuredClone(request);
+  for (const field of copy.body.fields) delete field.fileBase64;
+  return copy;
+}
+
+async function sendCurrent() {
+  const button = $('#send');
+  button.disabled = true;
+  $('#res-meta').textContent = '보내는 중…';
+  $('#res-body').textContent = '';
+  $('#res-headers').replaceChildren();
+  let result;
+  try {
+    result = await api('POST', '/api/send', { ...current, variables: activeVariables(), settings: data.settings });
+  } catch (err) {
+    result = { ok: false, error: { code: '', message: err.message, hint: '' } };
+  }
+  button.disabled = false;
+  showResponse(result);
+  data.history.unshift({
+    at: new Date().toISOString(),
+    request: withoutFiles(current),
+    status: result.ok ? result.status : null,
+    timeMs: result.ok ? result.timeMs : null,
+  });
+  data.history.splice(HISTORY_LIMIT);
+  renderHistory();
+  save();
+}
+
+const pretty = (text) => { try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; } };
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function showResponse(result) {
+  const meta = $('#res-meta');
+  if (!result.ok) {
+    const { code, message, hint } = result.error;
+    meta.replaceChildren(el('span', { className: 'error', textContent: code ? `${code} · ${message}` : message }));
+    $('#res-body').textContent = hint || '';
+    $('#res-headers').replaceChildren();
+    return;
+  }
+  meta.replaceChildren(
+    el('span', { className: `s${String(result.status)[0]}`, textContent: `${result.status} ${result.statusText}` }),
+    ` · ${result.timeMs} ms · ${formatSize(result.size)}`,
+    result.truncated ? ' · 앞 10MB 만 표시' : '',
+  );
+  $('#res-body').textContent = pretty(result.body);
+  $('#res-headers').replaceChildren(...result.headers.map(([k, v]) => el('tr', {}, el('td', { textContent: k }), el('td', { textContent: v }))));
+}
+
+function findNode(nodes, id) {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.type === 'folder') {
+      const found = findNode(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function removeNode(nodes, id) {
+  const i = nodes.findIndex((n) => n.id === id);
+  if (i >= 0) {
+    nodes.splice(i, 1);
+    return true;
+  }
+  return nodes.some((n) => n.type === 'folder' && removeNode(n.children, id));
+}
+
+const folder = (name) => ({ id: newId(), name, type: 'folder', children: [] });
+
+function renderTree() {
+  $('#tree').replaceChildren(treeList(data.collections));
+}
+
+function treeList(nodes) {
+  return el('ul', { className: 'tree' }, ...nodes.map((node) => {
+    const label = el('span', { className: 'node', title: node.name });
+    if (node.type === 'folder') {
+      label.textContent = `${collapsed.has(node.id) ? '▶' : '▼'} ${node.name}`;
+      label.onclick = () => {
+        if (collapsed.has(node.id)) collapsed.delete(node.id);
+        else collapsed.add(node.id);
+        renderTree();
+      };
+    } else {
+      label.append(el('span', { className: 'method', textContent: node.request.method }), node.name);
+      label.classList.toggle('selected', node.id === currentId);
+      label.onclick = () => openRequest(node.request, node.id);
+    }
+    label.oncontextmenu = (event) => {
+      event.preventDefault();
+      showMenu(event, node);
+    };
+    const item = el('li', {}, label);
+    if (node.type === 'folder' && !collapsed.has(node.id)) item.append(treeList(node.children));
+    return item;
+  }));
+}
+
+function showMenu(event, node) {
+  const actions = [
+    ['이름 변경', () => {
+      const name = prompt('새 이름', node.name)?.trim();
+      if (!name) return;
+      node.name = name;
+      renderTree();
+      save();
+    }],
+    ['삭제', () => {
+      if (!confirm(`"${node.name}" 을(를) 삭제할까요?`)) return;
+      removeNode(data.collections, node.id);
+      if (currentId && !findNode(data.collections, currentId)) currentId = null;
+      renderTree();
+      save();
+    }],
+  ];
+  if (node.type === 'folder') {
+    actions.unshift(['하위 폴더 추가', () => {
+      const name = prompt('폴더 이름')?.trim();
+      if (!name) return;
+      node.children.push(folder(name));
+      renderTree();
+      save();
+    }]);
+  }
+  const menu = $('#menu');
+  menu.replaceChildren(...actions.map(([text, run]) => el('button', { type: 'button', textContent: text, onclick: () => { menu.hidden = true; run(); } })));
+  menu.style.left = `${event.clientX}px`;
+  menu.style.top = `${event.clientY}px`;
+  menu.hidden = false;
+}
+
+function folderOptions(nodes, prefix) {
+  const options = [];
+  for (const node of nodes) {
+    if (node.type !== 'folder') continue;
+    options.push(el('option', { value: node.id, textContent: prefix + node.name }), ...folderOptions(node.children, `${prefix}${node.name} / `));
+  }
+  return options;
+}
+
+function saveCurrent() {
+  const node = currentId && findNode(data.collections, currentId);
+  if (node) {
+    node.request = structuredClone(current);
+    renderTree();
+    save();
+    toast('저장했습니다');
+    return;
+  }
+  $('#save-folder').replaceChildren(el('option', { value: '', textContent: '(최상위)' }), ...folderOptions(data.collections, ''));
+  $('#save-name').value = current.url || '새 요청';
+  $('#save-dialog').returnValue = '';
+  $('#save-dialog').showModal();
+}
+
+function renderHistory() {
+  $('#history').replaceChildren(...data.history.map((entry) => {
+    const item = el('li', { title: entry.request.url },
+      el('span', { className: 'method', textContent: entry.request.method }),
+      entry.request.url,
+      el('small', { textContent: `${entry.status ?? '실패'} · ${new Date(entry.at).toLocaleString()}` }));
+    item.onclick = () => openRequest(entry.request, null);
+    return item;
+  }));
+}
+
+function renderEnvSelect() {
+  $('#env').replaceChildren(el('option', { value: '', textContent: '환경 없음' }), ...data.environments.map((e) => el('option', { value: e.id, textContent: e.name })));
+  $('#env').value = data.activeEnvironmentId || '';
+}
+
+let editingEnv = null;
+
+function renderEnvDialog() {
+  $('#env-pick').replaceChildren(...data.environments.map((e) => el('option', { value: e.id, textContent: e.name })));
+  $('#env-pick').value = editingEnv?.id || '';
+  $('#env-name').value = editingEnv?.name || '';
+  $('#env-name').disabled = !editingEnv;
+  $('#env-del').disabled = !editingEnv;
+  if (editingEnv) renderKv($('#env-vars'), editingEnv.variables, () => {});
+  else $('#env-vars').replaceChildren();
+}
+
+function bindEvents() {
+  setupTabs($('#side-tabs'));
+  setupTabs($('#req-tabs'));
+  setupTabs($('#res-tabs'));
+  document.addEventListener('click', () => { $('#menu').hidden = true; });
+
+  $('#method').onchange = (e) => { current.method = e.target.value; };
+  $('#url').oninput = (e) => {
+    parseUrlInput(e.target.value);
+    renderKv($('#params'), current.params, onParamsChange);
+  };
+  $('#url').onkeydown = (e) => { if (e.key === 'Enter') sendCurrent(); };
+  $('#send').onclick = sendCurrent;
+  $('#save').onclick = saveCurrent;
+
+  $('#auth-type').onchange = (e) => { current.auth.type = e.target.value; showAuth(); };
+  $('#auth-token').oninput = (e) => { current.auth.token = e.target.value; };
+  $('#auth-user').oninput = (e) => { current.auth.username = e.target.value; };
+  $('#auth-pass').oninput = (e) => { current.auth.password = e.target.value; };
+  for (const radio of document.querySelectorAll('input[name=body-type]')) {
+    radio.onchange = () => { current.body.type = radio.value; showBody(); };
+  }
+  $('#body-raw').oninput = (e) => { current.body.raw = e.target.value; };
+
+  $('#new-request').onclick = () => openRequest(blankRequest(), null);
+  $('#new-folder').onclick = () => {
+    const name = prompt('폴더 이름')?.trim();
+    if (!name) return;
+    data.collections.push(folder(name));
+    renderTree();
+    save();
+  };
+
+  $('#save-dialog').onclose = () => {
+    if ($('#save-dialog').returnValue !== 'ok') return;
+    const name = $('#save-name').value.trim();
+    if (!name) return toast('이름을 입력하세요', 'error');
+    const node = { id: newId(), name, type: 'request', request: structuredClone(current) };
+    const parent = findNode(data.collections, $('#save-folder').value);
+    (parent ? parent.children : data.collections).push(node);
+    currentId = node.id;
+    renderTree();
+    save();
+  };
+
+  $('#env').onchange = (e) => {
+    data.activeEnvironmentId = e.target.value || null;
+    save();
+  };
+  $('#edit-env').onclick = () => {
+    editingEnv = data.environments.find((e) => e.id === data.activeEnvironmentId) || data.environments[0] || null;
+    renderEnvDialog();
+    $('#env-dialog').showModal();
+  };
+  $('#env-pick').onchange = (e) => {
+    editingEnv = data.environments.find((x) => x.id === e.target.value) || null;
+    renderEnvDialog();
+  };
+  $('#env-add').onclick = () => {
+    editingEnv = { id: newId(), name: `환경 ${data.environments.length + 1}`, variables: [] };
+    data.environments.push(editingEnv);
+    renderEnvDialog();
+  };
+  $('#env-del').onclick = () => {
+    if (!confirm(`"${editingEnv.name}" 환경을 삭제할까요?`)) return;
+    data.environments.splice(data.environments.indexOf(editingEnv), 1);
+    if (data.activeEnvironmentId === editingEnv.id) data.activeEnvironmentId = null;
+    editingEnv = data.environments[0] || null;
+    renderEnvDialog();
+  };
+  $('#env-name').oninput = (e) => { editingEnv.name = e.target.value; };
+  $('#env-dialog').onclose = () => {
+    renderEnvSelect();
+    save();
+  };
+
+  $('#open-settings').onclick = () => {
+    $('#set-insecure').checked = data.settings.insecure;
+    $('#set-timeout').value = Math.round(data.settings.timeoutMs / 1000);
+    $('#settings-dialog').returnValue = '';
+    $('#settings-dialog').showModal();
+  };
+  $('#settings-dialog').onclose = () => {
+    if ($('#settings-dialog').returnValue !== 'ok') return;
+    const seconds = Number($('#set-timeout').value);
+    if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_TIMEOUT_SECONDS) {
+      return toast(`타임아웃은 1~${MAX_TIMEOUT_SECONDS}초 사이 정수여야 합니다`, 'error');
+    }
+    data.settings = { insecure: $('#set-insecure').checked, timeoutMs: seconds * 1000 };
+    save();
+  };
+
+  $('#import').onchange = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const { collection, skipped } = await api('POST', '/api/import/postman', JSON.parse(await file.text()));
+      data.collections.push(collection);
+      renderTree();
+      save();
+      toast(`"${collection.name}" 을(를) 가져왔습니다${skipped ? ` (지원하지 않는 항목 ${skipped}개 건너뜀)` : ''}`);
+    } catch (err) {
+      toast(`가져오기 실패: ${err.message}`, 'error');
+    }
+  };
+}
+
+async function init() {
+  $('#method').replaceChildren(...METHODS.map((m) => el('option', { value: m, textContent: m })));
+  bindEvents();
+  try {
+    const res = await api('GET', '/api/data');
+    data = res.data;
+    if (res.warning) toast(res.warning, 'warn');
+  } catch (err) {
+    toast(`데이터를 불러오지 못했습니다: ${err.message}`, 'error');
+    return;
+  }
+  renderEnvSelect();
+  renderHistory();
+  renderEditor();
+}
+
+init();
+</script>
+</body>
+</html>
