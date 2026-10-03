@@ -5,6 +5,7 @@ const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 
 // 화면에 원인을 보여줄 수 있는 실패. code 는 화면과 테스트가 실패 종류를 구분하는 데 쓴다.
@@ -62,7 +63,18 @@ async function buildRequest(spec) {
   for (const p of enabledRows(spec.params)) url.searchParams.append(sub(p.key), sub(p.value));
 
   const headers = {};
-  for (const h of enabledRows(spec.headers)) headers[sub(h.key)] = sub(h.value);
+  // Node 는 헤더에 Latin-1 밖의 문자(한글 등)를 넣으면 영문 오류를 던지므로, 보내기 전에 어느 헤더인지 알려준다.
+  for (const h of enabledRows(spec.headers)) {
+    const key = sub(h.key);
+    const value = sub(h.value);
+    try {
+      http.validateHeaderName(key);
+      http.validateHeaderValue(key, value);
+    } catch {
+      throw new RequestError('INVALID_HEADER', `헤더 "${key}" 에 보낼 수 없는 문자가 있습니다`, '한글 등은 URL 인코딩해서 넣으세요');
+    }
+    headers[key] = value;
+  }
 
   // Auth 탭을 고르면 Headers 탭의 Authorization 보다 우선한다.
   const auth = spec.auth || {};
@@ -106,6 +118,32 @@ async function buildRequest(spec) {
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 화면이 멈추지 않도록 응답 본문은 10MB 까지만 돌려준다
 const DEFAULT_TIMEOUT_MS = 30000;
 
+const DECOMPRESSORS = { gzip: zlib.gunzipSync, 'x-gzip': zlib.gunzipSync, deflate: zlib.inflateSync, br: zlib.brotliDecompressSync };
+
+// 압축을 풀고 Content-Type 의 charset 으로 해석한다. 잘린 압축 본문이나 풀 수 없는 본문은 받은 바이트 그대로 해석한다.
+// 압축을 푼 결과도 10MB 까지만 돌려준다.
+// ponytail: 압축 해제 크기에 상한이 없다. 테스트 대상 서버가 압축 폭탄을 보내면 메모리를 많이 쓴다.
+function decodeBody(raw, headers, truncated) {
+  let bytes = raw;
+  const decompress = DECOMPRESSORS[String(headers['content-encoding'] || '').trim().toLowerCase()];
+  if (decompress && !truncated) {
+    try {
+      bytes = decompress(raw);
+    } catch {
+      bytes = raw;
+    }
+  }
+  const charset = /charset=["']?([\w-]+)/i.exec(headers['content-type'] || '')?.[1] || 'utf-8';
+  let decoder;
+  try {
+    decoder = new TextDecoder(charset);
+  } catch {
+    decoder = new TextDecoder('utf-8');
+  }
+  const over = bytes.length > MAX_RESPONSE_BYTES;
+  return { text: decoder.decode(over ? bytes.subarray(0, MAX_RESPONSE_BYTES) : bytes), truncated: truncated || over };
+}
+
 // 요청을 보내고 응답 전체를 모은다. 연결 실패·타임아웃은 reject 하고, HTTP 오류 상태(4xx/5xx)는 정상 응답으로 돌려준다.
 // 리다이렉트는 따라가지 않고 3xx 응답을 그대로 보여준다.
 async function sendRequest(spec) {
@@ -136,6 +174,7 @@ async function sendRequest(spec) {
         clearTimeout(timer);
         const pairs = [];
         for (let i = 0; i < res.rawHeaders.length; i += 2) pairs.push([res.rawHeaders[i], res.rawHeaders[i + 1]]);
+        const decoded = decodeBody(Buffer.concat(chunks), res.headers, size > MAX_RESPONSE_BYTES);
         resolve({
           ok: true,
           status: res.statusCode,
@@ -143,8 +182,8 @@ async function sendRequest(spec) {
           timeMs: Math.round(performance.now() - started),
           size,
           headers: pairs,
-          body: Buffer.concat(chunks).toString('utf8'),
-          truncated: size > MAX_RESPONSE_BYTES,
+          body: decoded.text,
+          truncated: decoded.truncated,
         });
       });
     });

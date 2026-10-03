@@ -429,3 +429,25 @@ test('convertPostman: 폴더·컬렉션 인증을 상속하고, 컬렉션 변수
   assert.equal(folder.children[1].request.auth.type, 'none');
   assert.equal(skipped, 1);
 });
+
+test('buildRequest: 헤더에 보낼 수 없는 문자가 있으면 헤더 이름과 함께 거부한다', async () => {
+  await assert.rejects(buildRequest({ url: 'http://h', headers: [{ key: 'X-Name', value: '홍길동', enabled: true }] }), { code: 'INVALID_HEADER', message: /X-Name/ });
+  await assert.rejects(buildRequest({ url: 'http://h', headers: [{ key: '잘못된 이름', value: 'v', enabled: true }] }), { code: 'INVALID_HEADER' });
+});
+
+test('sendRequest: charset 에 맞춰 디코딩하고 gzip 압축을 푼다', async (t) => {
+  const zlib = require('node:zlib');
+  const server = http.createServer((req, res) => {
+    if (req.url === '/euckr') {
+      res.setHeader('Content-Type', 'text/plain; charset=euc-kr');
+      return res.end(Buffer.from([0xc7, 0xd1, 0xb1, 0xdb])); // '한글'
+    }
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Encoding', 'gzip');
+    res.end(zlib.gzipSync('{"a":"가"}'));
+  });
+  const base = await listen(server);
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  assert.equal((await sendRequest({ url: `${base}/euckr` })).body, '한글');
+  assert.equal((await sendRequest({ url: `${base}/gzip` })).body, '{"a":"가"}');
+});
