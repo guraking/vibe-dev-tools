@@ -176,3 +176,50 @@ test('toError: 연결 거부·SSL 오류·RequestError 를 화면용 메시지�
   assert.equal(toError(ssl).hint, 'SSL 검증 무시를 켜보세요');
   assert.deepEqual(toError(new RequestError('UNDEFINED_VARIABLE', 'x', 'y')), { code: 'UNDEFINED_VARIABLE', message: 'x', hint: 'y' });
 });
+
+function tempDataFile(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'api-client-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return path.join(dir, 'data.json');
+}
+
+test('loadData: 파일이 없으면 빈 구조를 돌려준다', (t) => {
+  const { data, warning } = loadData(tempDataFile(t));
+  assert.deepEqual(data, {
+    version: 1, collections: [], environments: [], activeEnvironmentId: null, history: [],
+    settings: { insecure: false, timeoutMs: 30000 },
+  });
+  assert.equal(warning, null);
+});
+
+test('loadData: 깨진 파일은 .broken-<시각> 으로 보존하고 새로 시작한다', (t) => {
+  const file = tempDataFile(t);
+  fs.writeFileSync(file, '{ 깨짐');
+  const { data, warning } = loadData(file);
+  assert.deepEqual(data.collections, []);
+  assert.match(warning, /data\.json\.broken-\d{8}-\d{6}/);
+  assert.equal(fs.existsSync(file), false);
+  const kept = fs.readdirSync(path.dirname(file)).filter((n) => n.startsWith('data.json.broken-'));
+  assert.equal(kept.length, 1);
+  assert.equal(fs.readFileSync(path.join(path.dirname(file), kept[0]), 'utf8'), '{ 깨짐');
+});
+
+test('saveData: 저장 후 다시 읽히고, 빠진 필드는 기본값으로 채운다', (t) => {
+  const file = tempDataFile(t);
+  const folder = { id: '1', name: 'f', type: 'folder', children: [] };
+  saveData(file, { collections: [folder], settings: { insecure: true } });
+  const { data } = loadData(file);
+  assert.deepEqual(data.collections, [folder]);
+  assert.deepEqual(data.history, []);
+  assert.deepEqual(data.settings, { insecure: true, timeoutMs: 30000 });
+  assert.equal(fs.existsSync(`${file}.tmp`), false);
+});
+
+test('saveData: 형식이 틀리면 거부하고 기존 파일을 건드리지 않는다', (t) => {
+  const file = tempDataFile(t);
+  saveData(file, { history: [] });
+  const before = fs.readFileSync(file, 'utf8');
+  assert.throws(() => saveData(file, { history: 'x' }), { code: 'INVALID_DATA' });
+  assert.throws(() => saveData(file, [1, 2]), { code: 'INVALID_DATA' });
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+});

@@ -177,4 +177,59 @@ function toError(err) {
   return { code: err.code || 'ERROR', message: err.message, hint: '' };
 }
 
-module.exports = { RequestError, substitute, buildRequest, sendRequest, toError };
+const emptyData = () => ({
+  version: 1,
+  collections: [],
+  environments: [],
+  activeEnvironmentId: null,
+  history: [],
+  settings: { insecure: false, timeoutMs: DEFAULT_TIMEOUT_MS },
+});
+
+// 저장·로드가 받아들이는 최소 형태. 있는 필드만 형식을 확인하고 빠진 필드는 기본값으로 채운다.
+function validateData(data) {
+  const ok = data && typeof data === 'object' && !Array.isArray(data)
+    && ['collections', 'environments', 'history'].every((key) => data[key] === undefined || Array.isArray(data[key]))
+    && (data.settings === undefined || (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)));
+  if (!ok) throw new RequestError('INVALID_DATA', '저장할 데이터 형식이 올바르지 않습니다');
+}
+
+function withDefaults(data) {
+  const empty = emptyData();
+  return { ...empty, ...data, settings: { ...empty.settings, ...data.settings } };
+}
+
+function timestamp(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+// 사용자 데이터를 조용히 덮어쓰지 않도록, 읽을 수 없는 파일은 지우지 않고 이름을 바꿔 남긴다.
+function loadData(file) {
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return { data: emptyData(), warning: null };
+    throw err;
+  }
+  try {
+    const data = JSON.parse(text);
+    validateData(data);
+    return { data: withDefaults(data), warning: null };
+  } catch {
+    const kept = `${file}.broken-${timestamp()}`;
+    fs.renameSync(file, kept);
+    return { data: emptyData(), warning: `data.json 을 읽을 수 없어 ${path.basename(kept)} 로 보관하고 새로 시작합니다` };
+  }
+}
+
+// 임시 파일에 다 쓴 뒤 rename 하므로, 쓰는 도중 끊겨도 기존 data.json 은 온전하다.
+function saveData(file, data) {
+  validateData(data);
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(withDefaults(data), null, 2));
+  fs.renameSync(tmp, file);
+}
+
+module.exports = { RequestError, substitute, buildRequest, sendRequest, toError, loadData, saveData };
