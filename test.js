@@ -223,3 +223,84 @@ test('saveData: 형식이 틀리면 거부하고 기존 파일을 건드리지 �
   assert.throws(() => saveData(file, [1, 2]), { code: 'INVALID_DATA' });
   assert.equal(fs.readFileSync(file, 'utf8'), before);
 });
+
+const POSTMAN_SAMPLE = {
+  info: { name: '주문 API', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+  event: [{ listen: 'prerequest', script: { exec: [''] } }],
+  item: [
+    {
+      name: '주문',
+      item: [
+        {
+          name: '목록',
+          event: [{ listen: 'test', script: { exec: [''] } }],
+          request: {
+            method: 'GET',
+            header: [{ key: 'Accept', value: 'application/json' }, { key: 'X-Off', value: '1', disabled: true }],
+            url: { raw: '{{baseUrl}}/orders?page=1', query: [{ key: 'page', value: '1' }] },
+            auth: { type: 'bearer', bearer: [{ key: 'token', value: '{{token}}', type: 'string' }] },
+          },
+        },
+        {
+          name: '생성',
+          request: {
+            method: 'POST',
+            url: '{{baseUrl}}/orders',
+            body: { mode: 'raw', raw: '{"a":1}', options: { raw: { language: 'json' } } },
+          },
+        },
+      ],
+    },
+    {
+      name: '업로드',
+      request: {
+        method: 'post',
+        url: { raw: 'http://h/u' },
+        auth: { type: 'basic', basic: [{ key: 'username', value: 'u' }, { key: 'password', value: 'p' }] },
+        body: { mode: 'formdata', formdata: [{ key: 't', value: 'v', type: 'text' }, { key: 'f', src: 'C:/a.png', type: 'file' }] },
+      },
+    },
+  ],
+};
+
+test('convertPostman: 폴더·요청·params·헤더·인증·본문을 변환하고 건너뛴 항목을 센다', () => {
+  const { collection, skipped } = convertPostman(POSTMAN_SAMPLE);
+  assert.equal(skipped, 3); // 스크립트 2개 + 파일 필드 1개
+  assert.equal(collection.type, 'folder');
+  assert.equal(collection.name, '주문 API');
+
+  const [folder, upload] = collection.children;
+  assert.equal(folder.name, '주문');
+  const [list, create] = folder.children;
+  assert.equal(list.type, 'request');
+  assert.deepEqual(list.request.params, [{ key: 'page', value: '1', enabled: true }]);
+  assert.equal(list.request.url, '{{baseUrl}}/orders');
+  assert.deepEqual(list.request.headers, [
+    { key: 'Accept', value: 'application/json', enabled: true },
+    { key: 'X-Off', value: '1', enabled: false },
+  ]);
+  assert.deepEqual(list.request.auth, { type: 'bearer', token: '{{token}}', username: '', password: '' });
+
+  assert.equal(create.request.method, 'POST');
+  assert.deepEqual(create.request.body, { type: 'json', raw: '{"a":1}', fields: [] });
+
+  assert.equal(upload.request.method, 'POST');
+  assert.deepEqual(upload.request.auth, { type: 'basic', token: '', username: 'u', password: 'p' });
+  assert.deepEqual(upload.request.body.fields, [{ key: 't', value: 'v', enabled: true, type: 'text' }]);
+});
+
+test('convertPostman: v2.0 의 문자열 URL 과 객체형 인증 값도 읽는다', () => {
+  const { collection } = convertPostman({
+    info: { name: 'old', schema: 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json' },
+    item: [{ name: 'r', request: { url: 'http://h/a?x=1&y', method: 'GET', auth: { type: 'bearer', bearer: { token: 't' } } } }],
+  });
+  const { request } = collection.children[0];
+  assert.equal(request.url, 'http://h/a');
+  assert.deepEqual(request.params, [{ key: 'x', value: '1', enabled: true }, { key: 'y', value: '', enabled: true }]);
+  assert.equal(request.auth.token, 't');
+});
+
+test('convertPostman: v2 형식이 아니면 거부한다', () => {
+  assert.throws(() => convertPostman({ info: { schema: 'https://schema.getpostman.com/json/collection/v1.0.0/' } }), { code: 'UNSUPPORTED_POSTMAN' });
+  assert.throws(() => convertPostman(null), { code: 'UNSUPPORTED_POSTMAN' });
+});

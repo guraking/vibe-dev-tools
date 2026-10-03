@@ -232,4 +232,92 @@ function saveData(file, data) {
   fs.renameSync(tmp, file);
 }
 
-module.exports = { RequestError, substitute, buildRequest, sendRequest, toError, loadData, saveData };
+const POSTMAN_SCHEMA = /\/collection\/v2\.[01]\.0\//;
+
+const blankRequest = () => ({
+  method: 'GET',
+  url: '',
+  params: [],
+  headers: [],
+  auth: { type: 'none', token: '', username: '', password: '' },
+  body: { type: 'none', raw: '', fields: [] },
+});
+
+const postmanRows = (list) => (Array.isArray(list) ? list : []).map((x) => ({ key: x.key ?? '', value: x.value ?? '', enabled: !x.disabled }));
+
+// v2.1 은 [{ key, value }] 배열, v2.0 은 { key: value } 객체로 인증 값을 담는다.
+const postmanAuthValue = (values, key) => (Array.isArray(values) ? values.find((x) => x.key === key)?.value : values?.[key]) ?? '';
+
+function parseQuery(query) {
+  return query.split('&').filter(Boolean).map((pair) => {
+    const i = pair.indexOf('=');
+    return { key: i < 0 ? pair : pair.slice(0, i), value: i < 0 ? '' : pair.slice(i + 1), enabled: true };
+  });
+}
+
+// Postman Collection v2.0 / v2.1 을 내부 컬렉션 노드로 바꾼다. 스크립트·파일 필드·미지원 인증/본문은 건너뛰고 skipped 로 센다.
+function convertPostman(json) {
+  if (!POSTMAN_SCHEMA.test(json?.info?.schema || '')) {
+    throw new RequestError('UNSUPPORTED_POSTMAN', 'Postman Collection v2.0 / v2.1 형식만 가져올 수 있습니다', 'Postman 에서 Export → Collection v2.1 로 내보내세요');
+  }
+  const state = { skipped: 0 };
+  const collection = convertPostmanFolder(json.info.name || 'Postman', json, state);
+  return { collection, skipped: state.skipped };
+}
+
+function convertPostmanFolder(name, folder, state) {
+  state.skipped += (folder.event || []).length;
+  const children = (folder.item || []).map((child) => (Array.isArray(child.item)
+    ? convertPostmanFolder(child.name || '폴더', child, state)
+    : convertPostmanItem(child, state)));
+  return { id: crypto.randomUUID(), name, type: 'folder', children };
+}
+
+function convertPostmanItem(item, state) {
+  state.skipped += (item.event || []).length;
+  return { id: crypto.randomUUID(), name: item.name || '요청', type: 'request', request: convertPostmanRequest(item.request, state) };
+}
+
+function convertPostmanRequest(source, state) {
+  const request = blankRequest();
+  // v2.0 은 request 자리에 URL 문자열만 둘 수 있다.
+  const r = typeof source === 'string' ? { url: source } : source;
+  if (!r) return request;
+
+  request.method = String(r.method || 'GET').toUpperCase();
+  const raw = typeof r.url === 'string' ? r.url : r.url?.raw || '';
+  const q = raw.indexOf('?');
+  request.url = q < 0 ? raw : raw.slice(0, q);
+  request.params = r.url && typeof r.url === 'object' ? postmanRows(r.url.query) : parseQuery(q < 0 ? '' : raw.slice(q + 1));
+  request.headers = postmanRows(r.header);
+
+  const auth = r.auth;
+  if (auth?.type === 'bearer') {
+    request.auth.type = 'bearer';
+    request.auth.token = postmanAuthValue(auth.bearer, 'token');
+  } else if (auth?.type === 'basic') {
+    request.auth.type = 'basic';
+    request.auth.username = postmanAuthValue(auth.basic, 'username');
+    request.auth.password = postmanAuthValue(auth.basic, 'password');
+  } else if (auth && auth.type !== 'noauth') {
+    state.skipped += 1;
+  }
+
+  const body = r.body;
+  if (body?.mode === 'raw') {
+    request.body = { type: body.options?.raw?.language === 'json' ? 'json' : 'raw', raw: body.raw || '', fields: [] };
+  } else if (body?.mode === 'urlencoded') {
+    request.body = { type: 'urlencoded', raw: '', fields: postmanRows(body.urlencoded) };
+  } else if (body?.mode === 'formdata') {
+    // 파일 내용은 Postman 내보내기에 들어 있지 않으므로 파일 필드는 가져오지 않는다.
+    const all = body.formdata || [];
+    const texts = all.filter((f) => f.type !== 'file');
+    state.skipped += all.length - texts.length;
+    request.body = { type: 'form', raw: '', fields: postmanRows(texts).map((f) => ({ ...f, type: 'text' })) };
+  } else if (body?.mode) {
+    state.skipped += 1;
+  }
+  return request;
+}
+
+module.exports = { RequestError, substitute, buildRequest, sendRequest, toError, loadData, saveData, convertPostman };
