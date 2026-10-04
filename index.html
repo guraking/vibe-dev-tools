@@ -85,8 +85,6 @@
   #host { margin-left: 4px; font: 12px var(--mono); color: var(--muted); }
   #topbar button, #topbar label.button { background: none; color: var(--muted); }
   #topbar button:hover, #topbar label.button:hover { background: var(--hover); color: var(--text); }
-  #topbar label.env { display: flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--muted); }
-  #topbar label.env select { height: 30px; min-width: 150px; color: var(--text); }
 
   /* 레이아웃: 아이콘 레일 | 사이드바 | 손잡이 | 작업 영역. 저장된 사이드바 너비에는 레일이 들어가지 않는다 */
   #app { flex: 1; min-height: 0; display: grid; grid-template-columns: 64px var(--sidebar-width, 280px) 6px 1fr; }
@@ -268,8 +266,6 @@
   <span id="brand">KingGura Tools</span>
   <span id="host"></span>
   <span class="spacer"></span>
-  <label class="env" title="환경"><i data-icon="layers"></i><select id="env"></select></label>
-  <button type="button" id="edit-env">환경 편집</button>
   <label class="button" title="Postman 컬렉션 가져오기"><i data-icon="upload"></i>가져오기<input type="file" id="import" accept=".json,application/json" hidden></label>
   <button type="button" id="open-settings" class="icon-btn" title="설정"><i data-icon="settings"></i></button>
 </header>
@@ -360,20 +356,6 @@
     <label>이름 <input id="save-name" required></label>
     <label>폴더 <select id="save-folder"></select></label>
     <div class="row end"><button type="button" onclick="this.closest('dialog').close('cancel')">취소</button><button value="ok" class="primary">저장</button></div>
-  </form>
-</dialog>
-
-<dialog id="env-dialog">
-  <form method="dialog">
-    <h3>환경 편집</h3>
-    <div class="row">
-      <select id="env-pick"></select>
-      <button type="button" id="env-add">추가</button>
-      <button type="button" id="env-del">삭제</button>
-    </div>
-    <label>이름 <input id="env-name"></label>
-    <table class="kv" id="env-vars"></table>
-    <div class="row end"><button value="ok" class="primary">닫기</button></div>
   </form>
 </dialog>
 
@@ -973,23 +955,6 @@ function renderHistory() {
   }));
 }
 
-function renderEnvSelect() {
-  $('#env').replaceChildren(el('option', { value: '', textContent: '환경 없음' }), ...data.environments.map((e) => el('option', { value: e.id, textContent: e.name })));
-  $('#env').value = data.activeEnvironmentId || '';
-}
-
-let editingEnv = null;
-
-function renderEnvDialog() {
-  $('#env-pick').replaceChildren(...data.environments.map((e) => el('option', { value: e.id, textContent: e.name })));
-  $('#env-pick').value = editingEnv?.id || '';
-  $('#env-name').value = editingEnv?.name || '';
-  $('#env-name').disabled = !editingEnv;
-  $('#env-del').disabled = !editingEnv;
-  if (editingEnv) renderKv($('#env-vars'), editingEnv.variables, () => {});
-  else $('#env-vars').replaceChildren();
-}
-
 function applySidebarWidth(px) {
   const width = Math.round(Math.min(Math.max(px, MIN_SIDEBAR_PX), innerWidth * MAX_SIDEBAR_RATIO));
   document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
@@ -1083,40 +1048,6 @@ function bindEvents() {
     toast('저장했습니다');
   };
 
-  $('#env').onchange = (e) => {
-    data.activeEnvironmentId = e.target.value || null;
-    save();
-  };
-  $('#edit-env').onclick = () => {
-    editingEnv = data.environments.find((e) => e.id === data.activeEnvironmentId) || data.environments[0] || null;
-    renderEnvDialog();
-    $('#env-dialog').showModal();
-  };
-  $('#env-pick').onchange = (e) => {
-    editingEnv = data.environments.find((x) => x.id === e.target.value) || null;
-    renderEnvDialog();
-  };
-  $('#env-add').onclick = () => {
-    editingEnv = { id: newId(), name: `환경 ${data.environments.length + 1}`, variables: [] };
-    data.environments.push(editingEnv);
-    renderEnvDialog();
-  };
-  $('#env-del').onclick = () => {
-    if (!confirm(`"${editingEnv.name}" 환경을 삭제할까요?`)) return;
-    data.environments.splice(data.environments.indexOf(editingEnv), 1);
-    if (data.activeEnvironmentId === editingEnv.id) data.activeEnvironmentId = null;
-    editingEnv = data.environments[0] || null;
-    renderEnvDialog();
-  };
-  $('#env-name').oninput = (e) => {
-    editingEnv.name = e.target.value;
-    $('#env-pick').selectedOptions[0].textContent = e.target.value;
-  };
-  $('#env-dialog').onclose = () => {
-    renderEnvSelect();
-    save();
-  };
-
   $('#open-settings').onclick = () => {
     $('#set-insecure').checked = data.settings.insecure;
     $('#set-timeout').value = Math.round(data.settings.timeoutMs / 1000);
@@ -1173,7 +1104,6 @@ async function init() {
   bindEvents();
   applyTheme();
   if (data.settings.sidebarWidth) applySidebarWidth(data.settings.sidebarWidth);
-  renderEnvSelect();
   renderHistory();
   renderEditor();
   setInterval(() => api('POST', '/api/ping', {}).catch(() => {}), PING_INTERVAL_MS);
